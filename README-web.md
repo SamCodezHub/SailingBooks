@@ -35,24 +35,30 @@ Same Wi-Fi is only the simplest option. To read from mobile data, a hotel
 Wi-Fi, or anywhere else, put a tunnel in front of the server:
 
 ```
-winget install --id Cloudflare.cloudflared   (once)
 npm run tunnel
 ```
 
-It starts the server **and** prints a public HTTPS address like
-`https://something.trycloudflare.com`. Type that into the phone's browser from
-anywhere and sign in with the same password. The books still stream from your
-laptop — the tunnel only forwards the connection.
+It starts the server and prints a public HTTPS address like
+`https://something.trycloudflare.com`. Open that on the phone from any network
+and sign in with the same password. The books still stream from your laptop —
+the tunnel only forwards the connection.
 
-- The address is different every time you run it (that's fine, it's a quick
-  tunnel). For a permanent address, create a named Cloudflare Tunnel and a
-  free `trycloudflare`-style hostname.
+- **First run downloads Cloudflare's `cloudflared`** (about 55 MB) to
+  `%LOCALAPPDATA%\Sailing Books\tools\cloudflared.exe` (or
+  `~/.sailing-books/tools/` on macOS/Linux). It is a single file, needs no
+  installer and no admin rights. Delete it to undo. To install it yourself
+  instead: `winget install --id Cloudflare.cloudflared`.
+- If that download is blocked, the script falls back to the SSH client built
+  into Windows/macOS, which needs nothing installed but is best effort — the
+  address can change or fail. For a permanent address, create a named
+  Cloudflare Tunnel.
+- The address is different every time you run it (that's normal for a quick
+  tunnel).
 - **The laptop must be on, awake, and running this** while the phone reads.
   On Windows, set *Settings → Power → Screen and sleep → When plugged in, sleep
   after: Never* if you read for long periods.
-- Because the address is public, use a password only you know. The generated
-  one is long; if you set your own, make it long too. To refuse to start
-  without an explicit password: `set SB_REQUIRE_PASSWORD=1`.
+- Because the address is public, keep the password private. The generated one is
+  long; to refuse to start on a generated password: `set SB_REQUIRE_PASSWORD=1`.
 - Tailscale is the other good option — install it on the laptop *and* the
   phone, and the server is only reachable on your private network, never
   publicly at all. Use `npm run server` and the Tailscale IP.

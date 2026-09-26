@@ -396,6 +396,15 @@ if (process.env.SB_REQUIRE_PASSWORD === '1' && AUTH.generated) {
   console.error('  Example (PowerShell):  $env:SB_PASSWORD="something long and private"\n');
   process.exit(1);
 }
+// If we were started by server/tunnel.js, don't outlive it: on Windows a
+// killed parent never runs its cleanup, which would leave this holding the port.
+if (process.env.SB_PARENT_PID) {
+  const parentPid = +process.env.SB_PARENT_PID;
+  setInterval(() => {
+    try { process.kill(parentPid, 0); } catch { console.log('  parent gone — shutting down.'); process.exit(0); }
+  }, 4000).unref();
+}
+
 server.on('error', (e) => {
   if (e && e.code === 'EADDRINUSE') {
     console.error(`\n  Port ${PORT} is already in use — Sailing Books may already be running,`);
