@@ -1,0 +1,409 @@
+:root {
+  --bg: #ffffff;
+  --ink: #1a1a1a;
+  --muted: #8a8a8a;
+  --line: #ececec;
+  --soft: #f7f7f7;
+  --accent: #1a1a1a;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.06);
+}
+* { box-sizing: border-box; }
+/* Covers are <img> tags: never let them start native image-drags
+   (those mimic file drops and summon the import overlay). */
+img { -webkit-user-drag: none; user-select: none; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+#app { height: 100vh; display: flex; flex-direction: column; }
+
+/* Top bar — one search field, nothing else. */
+#topbar {
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px 22px;
+  background: #fff;
+  user-select: none;
+}
+/* The field itself is invisible at rest — it reads as part of the page — and
+   only draws itself in when you point at it or start typing. */
+#searchInput {
+  width: min(460px, 60vw);
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  color: var(--ink);
+  text-align: center;
+  transition: background .13s ease, border-color .13s ease, box-shadow .13s ease;
+}
+#searchInput::placeholder { color: #bdbdbd; }
+#searchInput:focus {
+  background: var(--soft);
+  border-color: var(--line);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  text-align: left;
+}
+
+/* Buttons */
+.btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all .15s ease;
+  white-space: nowrap;
+}
+.btn:hover { border-color: #d4d4d4; background: var(--soft); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: .88; }
+.icon-btn {
+  border: 1px solid var(--line); background: #fff; border-radius: 8px;
+  padding: 5px 10px; cursor: pointer; font-size: 13px;
+}
+.icon-btn:hover { background: var(--soft); }
+
+/* Library */
+#libraryView { flex: 1; overflow-y: auto; padding: 18px 28px 60px; position: relative; }
+#breadcrumbRow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 4px 0 6px; }
+#breadcrumb { font-size: 13px; color: var(--muted); }
+#breadcrumb b { color: var(--ink); font-weight: 650; }
+#breadcrumb .crumb { cursor: pointer; }
+#breadcrumb .crumb:hover { color: var(--ink); text-decoration: underline; }
+#libHint { font-size: 12px; color: #b5b5b5; }
+.section-title { font-size: 13px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 18px 0 12px; }
+
+#shelfGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.folder-card {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 14px 12px 18px; background: #fff; cursor: pointer;
+  transition: box-shadow .15s, transform .15s, border-color .15s;
+  position: relative; overflow: hidden;
+  user-select: none;
+}
+.folder-card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.folder-card.dragover { border-color: #1a1a1a; box-shadow: 0 0 0 2px #1a1a1a inset; }
+.folder-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-count { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.folder-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+
+/* Compact book tiles: folder-like cards, one book each, draggable. */
+.book-tile {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 12px; background: #fff; cursor: pointer;
+  display: flex; gap: 11px; align-items: center;
+  transition: box-shadow .15s, transform .15s;
+  user-select: none; overflow: hidden; position: relative;
+}
+.book-tile:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.shelf-thumb {
+  width: 46px; height: 64px; border-radius: 7px; object-fit: cover; flex: none;
+  background: var(--soft); display: flex; align-items: center; justify-content: center;
+  font-size: 22px; overflow: hidden;
+}
+.shelf-meta { min-width: 0; flex: 1; }
+.shelf-title { font-weight: 600; font-size: 13.5px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.shelf-sub { font-size: 12px; color: var(--muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#booksGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.book-card {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: #fff; overflow: hidden; cursor: pointer;
+  transition: box-shadow .15s, transform .15s;
+  user-select: none;
+}
+.book-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+.book-card.dragging { opacity: .45; }
+.book-cover {
+  height: 190px; background: var(--soft);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 44px; overflow: hidden; position: relative;
+}
+.book-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; background: var(--soft); }
+/* A cover smaller than its box would smear when stretched: show it 1:1. */
+.book-cover img.cover-tiny, #audioCover img.cover-tiny {
+  position: static; inset: auto; width: auto; height: auto;
+  max-width: 100%; max-height: 100%; object-fit: contain; background: transparent;
+}
+.book-cover.audio { background: #fafafa; }
+.type-badge {
+  position: absolute; top: 8px; left: 8px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  background: rgba(255,255,255,.92); border: 1px solid var(--line);
+  padding: 3px 8px; border-radius: 999px;
+}
+.book-meta { padding: 10px 11px 12px; }
+.book-title { font-size: 13.5px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 36px; }
+.book-sub { font-size: 12px; color: var(--muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.progress-track { height: 3px; background: #f0f0f0; border-radius: 99px; margin-top: 8px; overflow: hidden; }
+.progress-fill { height: 100%; background: #1a1a1a; width: 0%; }
+
+#emptyState { text-align: center; padding: 56px 20px; border: 1.5px dashed var(--line); border-radius: 18px; margin-top: 6px; background: #fff; }
+.empty-title { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.empty-sub { color: var(--muted); font-size: 14px; margin-top: 8px; line-height: 1.6; }
+.empty-actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
+
+/* Drop overlay */
+#dropOverlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(255,255,255,.86);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+#dropOverlay.hidden { display: none; }
+.drop-box { border: 2px dashed #cfcfcf; border-radius: 22px; padding: 60px 90px; text-align: center; background: #fff; }
+.drop-title { font-size: 20px; font-weight: 700; }
+.drop-sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+/* Reader */
+#readerView { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
+#readerView.hidden { display: none; }
+#readerBar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 20px; border-bottom: 1px solid var(--line); background: #fff;
+}
+#readerTitleWrap { flex: 1; min-width: 0; }
+#readerTitle { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#readerMeta { font-size: 12px; color: var(--muted); }
+#readerControls .font-group { display: flex; align-items: center; gap: 7px; }
+#fontSizeLabel { font-size: 12px; color: var(--muted); min-width: 38px; text-align: center; }
+#readerControls select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 13px; background: #fff; }
+
+#epubScroll { flex: 1; overflow-y: auto; background: #fff; }
+#epubScroll.hidden { display: none; }
+#epubContent {
+  max-width: 700px; margin: 0 auto; padding: 44px 28px 120px;
+  color: #222;
+  transition: font-size .1s;
+}
+#epubContent img { max-width: 100%; height: auto; border-radius: 6px; }
+#epubContent p { margin: 0 0 1em; }
+#epubContent h1, #epubContent h2, #epubContent h3 { line-height: 1.25; margin: 1.6em 0 .6em; color: #111; }
+.chapter-break { border: 0; border-top: 1px solid var(--line); margin: 48px auto; max-width: 220px; }
+
+/* Chapter nav + paginated EPUB + TOC drawer */
+#chapterNav {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 20px; border-bottom: 1px solid var(--line); background: #fff;
+  font-size: 13px;
+}
+#chapterNav.hidden { display: none; }
+#chapterGroup, #viewToggle, #pageGroup { display: inline-flex; align-items: center; gap: 6px; }
+#chapterGroup.hidden, #viewToggle.hidden, #pageGroup.hidden { display: none; }
+#chapterLabel { font-weight: 650; max-width: 44vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#pageLabel { font-size: 12px; color: var(--muted); min-width: 52px; text-align: center; }
+.icon-btn.seg { border-radius: 0; }
+.icon-btn.seg:first-child { border-radius: 8px 0 0 8px; }
+.icon-btn.seg:last-child { border-radius: 0 8px 8px 0; margin-left: -7px; }
+.icon-btn.seg.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+#epubPaged { flex: 1; overflow: hidden; background: #fff; }
+#epubPaged.hidden { display: none; }
+#pagedInner {
+  height: 100%; color: #222;
+  column-gap: 56px; padding: 34px 0; margin: 0 auto;
+  transition: transform .18s ease;
+}
+#pagedInner img { max-width: 100%; height: auto; break-inside: avoid; border-radius: 6px; }
+#pagedInner p, #pagedInner h1, #pagedInner h2, #pagedInner h3, #pagedInner figure, #pagedInner blockquote { break-inside: avoid; }
+#pagedInner h1, #pagedInner h2, #pagedInner h3 { line-height: 1.25; color: #111; }
+
+#tocDrawer {
+  position: absolute; left: 0; top: 0; bottom: 0; width: min(320px, 84vw);
+  background: #fff; border-right: 1px solid var(--line); z-index: 40;
+  display: flex; flex-direction: column; box-shadow: 8px 0 30px rgba(0,0,0,.08);
+}
+#tocDrawer.hidden { display: none; }
+.toc-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--line);
+  font-weight: 700; font-size: 14px;
+}
+#tocList { overflow-y: auto; padding: 6px; flex: 1; }
+.toc-item {
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13.5px;
+  display: flex; gap: 8px; align-items: baseline; line-height: 1.35;
+}
+.toc-item:hover { background: var(--soft); }
+.toc-item.current { background: #1a1a1a; color: #fff; }
+.toc-item.current .toc-time { color: #ccc; }
+.toc-time { margin-left: auto; font-size: 11.5px; color: var(--muted); flex: none; }
+
+/* PDF reader */
+#pdfScroll { flex: 1; overflow-y: auto; background: #f4f4f4; }
+#pdfScroll.hidden { display: none; }
+#pdfPages { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px 16px 80px; }
+.pdf-page {
+  background: #fff; box-shadow: var(--shadow);
+  position: relative; overflow: hidden;
+}
+.pdf-page canvas { display: block; width: 100%; height: auto; }
+.pdf-page-num {
+  position: absolute; right: 10px; bottom: 8px;
+  font-size: 11px; color: #bbb; background: rgba(255,255,255,.85);
+  padding: 1px 8px; border-radius: 99px; pointer-events: none;
+}
+#pdfPageLabel, #pdfZoomLabel { font-size: 12px; color: var(--muted); min-width: 52px; text-align: center; }
+#readerControls .font-group.hidden { display: none; }
+
+#audioWrap { flex: 1; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center; padding: 48px 20px; }
+#audioWrap.hidden { display: none; }
+.audio-card { width: min(520px, 92vw); border: 1px solid var(--line); border-radius: 20px; padding: 36px 32px; text-align: center; box-shadow: var(--shadow); }
+.audio-cover { width: 120px; height: 120px; border-radius: 24px; background: var(--soft); display: flex; align-items: center; justify-content: center; font-size: 52px; margin: 0 auto; overflow: hidden; }
+.audio-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.audio-title { font-size: 20px; font-weight: 750; margin-top: 16px; }
+.audio-file { font-size: 12.5px; color: var(--muted); margin: 6px 0 18px; word-break: break-all; }
+#audioEl { width: 100%; }
+.audio-row { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 16px; }
+.speed-label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.speed-label select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+.audio-note { font-size: 12px; color: #b5b5b5; margin-top: 16px; }
+
+/* Pointer-drag drop targets */
+.folder-card.dragover { border-color: #1a1a1a; box-shadow: 0 0 0 2px #1a1a1a inset; }
+#crumbHome.crumb-drop { background: #1a1a1a !important; color: #fff !important; border-radius: 99px; padding: 2px 12px; }
+#flowChart.chart-drop { outline: 2px dashed #1a1a1a; outline-offset: -2px; border-radius: 14px; }
+.book-card { touch-action: pan-x pan-y; }
+.drag-ghost {
+  position: fixed; z-index: 200; pointer-events: none;
+  background: #1a1a1a; color: #fff; font-size: 13px; font-weight: 600;
+  padding: 9px 16px; border-radius: 999px; box-shadow: 0 12px 30px rgba(0,0,0,.3);
+  max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Reader fullscreen — position must be restated: #readerView is position:relative
+   in normal flow, and an author rule beats the UA's :fullscreen position:fixed,
+   which left the top of the screen showing the library behind it. */
+#readerView:fullscreen {
+  position: fixed; inset: 0; top: 0; left: 0; right: 0; bottom: 0;
+  width: 100%; height: 100%; background: #fff; z-index: 1;
+}
+#readerView:fullscreen #audioWrap { align-items: center; padding-top: 24px; }
+#btnFullscreen.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+/* Reading flowchart (free nodes + connections) */
+#orderSection.hidden { display: none; }
+#orderHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#orderHead .section-title { margin-bottom: 0; }
+#orderActions { display: flex; gap: 8px; }
+.btn.small { padding: 5px 12px; font-size: 12.5px; }
+#orderHint { font-size: 12px; color: #b5b5b5; margin: 4px 0 2px; }
+#flowChart {
+  position: relative;
+  /* Fixed viewport (not min-height): the world is `clientW/H x zoom` and
+     scrolls inside this box in both axes, so no part of the chart can end up
+     off-window where a node could never be dragged to. */
+  height: clamp(320px, 48vh, 600px);
+  border: 1px solid var(--line); border-radius: 14px; background: #fff;
+  overflow: auto; margin: 8px 0 30px;
+}
+#flowInner { position: relative; }
+#flowEdges { position: absolute; inset: 0; pointer-events: none; }
+#flowEdges .edge { pointer-events: auto; cursor: pointer; }
+#flowEdges .edge-hit { stroke: rgba(0,0,0,0); stroke-width: 14; fill: none; pointer-events: stroke; }
+#flowEdges .edge-line { stroke: #b5b5b5; stroke-width: 2.5; fill: none; pointer-events: none; }
+#flowEdges .edge:hover .edge-line { stroke: #1a1a1a; }
+.flow-node {
+  position: absolute; width: 150px;
+  border: 1px solid var(--line); border-radius: 12px; background: #fff;
+  padding: 12px 10px 10px; text-align: center; cursor: grab; user-select: none;
+  box-shadow: var(--shadow);
+}
+.flow-node:active { cursor: grabbing; }
+.flow-node.link-source { border-color: #1a1a1a; border-style: dashed; box-shadow: 0 0 0 2px #1a1a1a inset; }
+.flow-node.selected { outline: 2px dashed #2b7fff; outline-offset: 3px; }
+.flow-node.section-hi { box-shadow: 0 0 0 3px currentColor, var(--shadow); }
+.node-label { font-size: 13px; font-weight: 650; line-height: 1.35; word-break: break-word; }
+.node-book {
+  display: inline-block; margin-top: 7px; font-size: 12px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 8px; padding: 2px 10px; background: var(--soft);
+}
+.node-book:hover { border-color: #1a1a1a; }
+.flow-remove {
+  position: absolute; top: -9px; right: -9px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--line); color: #999; font-size: 12px; line-height: 1;
+  display: none; align-items: center; justify-content: center; cursor: pointer;
+}
+.flow-node:hover .flow-remove { display: flex; }
+.flow-remove:hover { color: #c0392b; border-color: #c0392b; }
+.flow-empty {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+  color: var(--muted); font-size: 13.5px; text-align: center; padding: 20px;
+  pointer-events: none;
+}
+.flow-empty .btn { margin-top: 10px; pointer-events: auto; }
+
+/* Chart zoom + sections */
+#chartZoomLabel { font-size: 12px; color: var(--muted); min-width: 44px; text-align: center; }
+#sectionBar { display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 0; }
+#sectionBar.hidden { display: none; }
+.section-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--line); border-radius: 999px; background: #fff;
+  padding: 4px 8px 4px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  user-select: none;
+}
+.section-chip:hover { border-color: #999; }
+.section-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+.section-count { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+.section-x {
+  border: none; background: none; color: #bbb; cursor: pointer;
+  font-size: 13px; line-height: 1; padding: 0 2px;
+}
+.section-x:hover { color: #c0392b; }
+.lasso-rect {
+  position: absolute; border: 1.5px dashed #2b7fff; background: rgba(43,127,255,.08);
+  pointer-events: none; z-index: 30;
+}
+
+/* Context menu */
+#contextMenu {
+  position: fixed; z-index: 100; min-width: 210px;
+  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.14);
+  padding: 6px; font-size: 13.5px;
+}
+#contextMenu.hidden { display: none; }
+#contextMenu { max-height: 62vh; overflow-y: auto; }
+.ctx-item { padding: 9px 12px; border-radius: 8px; cursor: pointer; display: flex; gap: 8px; align-items: center; }
+.ctx-item:hover { background: var(--soft); }
+.ctx-item.danger { color: #c0392b; }
+.ctx-sep { height: 1px; background: var(--line); margin: 5px 4px; }
+.ctx-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: 7px 12px 3px; }
+
+/* Modal */
+#modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,.18); z-index: 90; display: flex; align-items: center; justify-content: center; }
+#modalOverlay.hidden { display: none; }
+#modal { background: #fff; border-radius: 16px; padding: 22px; width: min(380px, 90vw); box-shadow: 0 24px 70px rgba(0,0,0,.2); }
+#modal h3 { margin: 0 0 12px; font-size: 16px; }
+#modalInput { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; outline: none; }
+#modalInput:focus { border-color: #999; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+#colorRow { display: flex; gap: 10px; margin-top: 14px; align-items: center; flex-wrap: wrap; }
+#colorRow.hidden { display: none; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+.swatch.selected { border-color: #1a1a1a; }
+
+#toast {
+  position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+  background: #1a1a1a; color: #fff; font-size: 13.5px;
+  padding: 11px 20px; border-radius: 999px; z-index: 120;
+  box-shadow: 0 10px 30px rgba(0,0,0,.25);
+}
+#toast.hidden { display: none; }
+
+@media (max-width: 720px) {
+  #libHint { display: none; }
+  #searchInput { width: 38vw; }
+  #readerControls .font-group select { max-width: 90px; }
+}

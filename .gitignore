@@ -1,0 +1,25 @@
+# dependencies (rebuilt by `npm install`)
+node_modules/
+
+# build output
+dist/
+dist-all/
+*.blockmap
+release/
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# local runtime data written by the app
+*.log
+library-index.json
+web-auth.json
+web-progress.json

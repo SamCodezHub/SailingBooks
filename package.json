@@ -1,0 +1,69 @@
+{
+  "name": "sailing-books",
+  "productName": "Sailing Books",
+  "version": "1.0.0",
+  "description": "Sailing Books — minimal EPUB & audiobook library and reader",
+  "main": "main.js",
+  "author": "Sailing Books",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "server": "node server/server.js",
+    "dist": "electron-builder --win",
+    "dist-all": "electron-builder -w -m -l"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "music-metadata": "^11.16.1",
+    "pdfjs-dist": "^3.4.120"
+  },
+  "devDependencies": {
+    "electron": "^43.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.sailing.books",
+    "productName": "Sailing Books",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "assets/**/*",
+      "web/**/*",
+      "server/**/*",
+      "package.json",
+      "node_modules/jszip/dist/jszip.min.js",
+      "node_modules/pdfjs-dist/build/pdf.js",
+      "node_modules/pdfjs-dist/build/pdf.worker.js",
+      "node_modules/music-metadata/**/*",
+      "node_modules/@borewit/text-codec/**/*",
+      "node_modules/@tokenizer/inflate/**/*",
+      "node_modules/@tokenizer/token/**/*",
+      "node_modules/content-type/**/*",
+      "node_modules/debug/**/*",
+      "node_modules/file-type/**/*",
+      "node_modules/ieee754/**/*",
+      "node_modules/media-typer/**/*",
+      "node_modules/ms/**/*",
+      "node_modules/strtok3/**/*",
+      "node_modules/token-types/**/*",
+      "node_modules/uint8array-extras/**/*",
+      "node_modules/win-guid/**/*"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "Sailing-Books-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Sailing Books"
+    }
+  }
+}

@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sailing Books</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="../node_modules/jszip/dist/jszip.min.js"></script>
+<script src="../node_modules/pdfjs-dist/build/pdf.js"></script>
+</head>
+<body>
+<div id="app">
+  <!-- ===== Top bar ===== -->
+  <header id="topbar">
+    <input id="searchInput" type="search" placeholder="Search books…" autocomplete="off" />
+  </header>
+
+  <!-- ===== Library view ===== -->
+  <main id="libraryView">
+    <div id="breadcrumbRow">
+      <nav id="breadcrumb"></nav>
+      <div id="libHint">Click to open · Drag tiles onto folders or the chart · Right-click for options</div>
+    </div>
+
+    <div id="dropOverlay" class="hidden">
+      <div class="drop-box">
+        <div class="drop-title">Drop to add to your library</div>
+        <div class="drop-sub">EPUB · PDF · MP3 · M4A · M4B · WAV · OGG · FLAC</div>
+      </div>
+    </div>
+
+    <section id="shelfSection">
+      <h2 class="section-title" id="shelfTitle">Folders &amp; Books</h2>
+      <div id="emptyState">
+        <div class="empty-title">Your shelf is empty</div>
+        <div class="empty-sub">Drag &amp; drop EPUB, PDF or audiobooks anywhere here,<br/>or click <b>+ Add books</b>. Create folders to organise.</div>
+        <div class="empty-actions">
+          <button class="btn primary" id="btnEmptyAdd">Add books</button>
+          <button class="btn ghost" id="btnEmptyFolder">New folder</button>
+        </div>
+      </div>
+      <div id="shelfGrid"></div>
+    </section>
+
+    <section id="booksSection">
+      <h2 class="section-title" id="booksTitle">Books</h2>
+      <div id="booksGrid"></div>
+    </section>
+
+    <section id="orderSection" class="hidden">
+      <div id="orderHead">
+        <h2 class="section-title" id="orderTitle">Reading flowchart</h2>
+        <div id="orderActions"></div>
+      </div>
+      <div id="orderHint">Drag a book here to make a node · drag nodes to arrange (hold one at the edge to auto-scroll) · scroll to zoom, drag empty space to pan · click one node then another to connect · right-drag over nodes to group a named section · double-click renames · right-click for more</div>
+      <div id="sectionBar" class="hidden"></div>
+      <div id="flowChart"></div>
+    </section>
+  </main>
+
+  <!-- ===== Reader view ===== -->
+  <main id="readerView" class="hidden">
+    <header id="readerBar">
+      <button id="btnBack" class="btn ghost" title="Back to library">← Library</button>
+      <div id="readerTitleWrap">
+        <div id="readerTitle">Untitled</div>
+        <div id="readerMeta"></div>
+      </div>
+      <div id="readerControls">
+        <div class="font-group" id="epubFontControls">
+          <button class="icon-btn" id="btnFontDec" title="Smaller text (or Ctrl + scroll)">A−</button>
+          <span id="fontSizeLabel">18px</span>
+          <button class="icon-btn" id="btnFontInc" title="Larger text (or Ctrl + scroll)">A+</button>
+          <select id="fontFamilySelect" title="Font type">
+            <option value="Georgia, 'Times New Roman', serif">Serif</option>
+            <option value="'Inter', 'Segoe UI', system-ui, sans-serif">Sans</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Times New Roman', Times, serif">Times</option>
+            <option value="'Segoe UI', system-ui, sans-serif">System</option>
+            <option value="'Verdana', sans-serif">Verdana</option>
+            <option value="'Atkinson Hyperlegible', Verdana, sans-serif">Readable</option>
+          </select>
+          <select id="lineHeightSelect" title="Line spacing">
+            <option value="1.5">Compact</option>
+            <option value="1.7" selected>Comfort</option>
+            <option value="2.0">Relaxed</option>
+          </select>
+        </div>
+        <div class="font-group hidden" id="pdfControls">
+          <button class="icon-btn" id="btnPdfPrev" title="Previous page">‹ Prev</button>
+          <span id="pdfPageLabel">1 / 1</span>
+          <button class="icon-btn" id="btnPdfNext" title="Next page">Next ›</button>
+          <button class="icon-btn" id="btnPdfZoomOut" title="Zoom out">−</button>
+          <span id="pdfZoomLabel">100%</span>
+          <button class="icon-btn" id="btnPdfZoomIn" title="Zoom in">+</button>
+          <button class="icon-btn" id="btnPdfFit" title="Fit page to width">Fit</button>
+        </div>
+      </div>
+      <button id="btnFullscreen" class="icon-btn" title="Fullscreen (F11)">Full</button>
+    </header>
+
+    <!-- Chapter / view navigation (EPUB + audiobooks with chapters) -->
+    <div id="chapterNav" class="hidden">
+      <button class="icon-btn" id="btnToc" title="Chapters">Chapters</button>
+      <span id="chapterGroup">
+        <button class="icon-btn" id="btnChapterPrev" title="Previous chapter">‹</button>
+        <span id="chapterLabel">Chapter 1</span>
+        <button class="icon-btn" id="btnChapterNext" title="Next chapter">›</button>
+      </span>
+      <span id="viewToggle">
+        <button class="icon-btn seg active" id="btnViewScroll" title="Scrolling view">Scroll</button>
+        <button class="icon-btn seg" id="btnViewPages" title="Paginated view — one page at a time">Pages</button>
+      </span>
+      <span id="pageGroup" class="hidden">
+        <button class="icon-btn" id="btnPagePrev" title="Previous page (←)">‹</button>
+        <span id="pageLabel">1 / 1</span>
+        <button class="icon-btn" id="btnPageNext" title="Next page (→)">›</button>
+      </span>
+    </div>
+
+    <!-- Chapter list drawer (EPUB TOC + audiobook chapters) -->
+    <aside id="tocDrawer" class="hidden">
+      <div class="toc-head"><span id="tocTitle">Chapters</span><button class="icon-btn" id="btnTocClose" title="Close">×</button></div>
+      <div id="tocList"></div>
+    </aside>
+
+    <!-- Scrolling EPUB body (one chapter at a time) -->
+    <div id="epubScroll" class="hidden">
+      <article id="epubContent"></article>
+    </div>
+
+    <!-- Paginated EPUB body (one chapter, one page at a time) -->
+    <div id="epubPaged" class="hidden">
+      <div id="pagedInner"></div>
+    </div>
+
+    <!-- Scrolling PDF body -->
+    <div id="pdfScroll" class="hidden">
+      <div id="pdfPages"></div>
+    </div>
+
+    <!-- Audiobook player -->
+    <div id="audioWrap" class="hidden">
+      <div class="audio-card">
+        <div class="audio-cover" id="audioCover"></div>
+        <div class="audio-title" id="audioTitle">Audiobook</div>
+        <div class="audio-file" id="audioFile"></div>
+        <audio id="audioEl" controls preload="metadata"></audio>
+        <div class="audio-row">
+          <button class="btn ghost" id="btnBack15" title="Back 15 seconds">−15s</button>
+          <button class="btn ghost" id="btnFwd30" title="Forward 30 seconds">+30s</button>
+          <label class="speed-label">Speed
+            <select id="audioSpeed">
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+              <option value="1.75">1.75×</option>
+              <option value="2">2×</option>
+            </select>
+          </label>
+        </div>
+        <div class="audio-note">Progress is saved automatically. Tip: Ctrl + scroll changes text size in EPUBs.</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- context menu + modal + toast -->
+  <div id="contextMenu" class="hidden"></div>
+
+  <div id="modalOverlay" class="hidden">
+    <div id="modal">
+      <h3 id="modalTitle">Rename</h3>
+      <input id="modalInput" type="text" maxlength="80" />
+      <div id="colorRow" class="hidden"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="modalCancel">Cancel</button>
+        <button class="btn primary" id="modalOk">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+</div>
+<script src="renderer.js"></script>
+</body>
+</html>
