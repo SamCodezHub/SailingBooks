@@ -593,8 +593,13 @@ function makeGhost(text) {
   return g;
 }
 function beginBookPointer(e, b) {
-  if (WEB) return;                      // reordering belongs to the desktop app
   if (e.button !== undefined && e.button > 0) return;
+  if (WEB) {
+    // No reordering on the phone, but a tap must still open the book — this is
+    // the same object the pointer-up handler looks at to decide "it was a tap".
+    ptrDrag = { kind: 'book', bookId: b.id, startX: e.clientX, startY: e.clientY, moved: false, ghost: null, pid: e.pointerId, tapOnly: true };
+    return;
+  }
   ptrDrag = { kind: 'book', bookId: b.id, startX: e.clientX, startY: e.clientY, moved: false, ghost: null, pid: e.pointerId };
 }
 function beginNodePointer(e, fid, nodeId, nodeEl) {
@@ -663,6 +668,12 @@ function onPointerMove(e) {
   const d = ptrDrag;
   if (!d || e.pointerId !== d.pid) return;
   const dx = e.clientX - d.startX, dy = e.clientY - d.startY;
+  // On the phone books are not draggable, so a swipe is just a swipe: cancel
+  // the press and let the page scroll, keeping the tap-to-open behaviour.
+  if (d.tapOnly) {
+    if (Math.hypot(dx, dy) >= 7) ptrDrag = null;
+    return;
+  }
   if (!d.moved) {
     if (Math.hypot(dx, dy) < 7) return;
     if (e.pointerType === 'touch') { ptrDrag = null; return; } // touch scrolls natively
