@@ -54,10 +54,12 @@ function loadAuth() {
     const a = JSON.parse(fs.readFileSync(authFile(), 'utf8'));
     if (a && a.password && a.secret) return { ...a, generated: false };
   } catch {}
-  const a = {
-    password: process.env.SB_PASSWORD || crypto.randomBytes(4).toString('hex'),
-    secret: crypto.randomBytes(32).toString('hex')
-  };
+  // Human-typable but long enough to survive a public tunnel (~80 bits).
+  const alphabet = 'abcdefghijkmnpqrstuvwxyz23456789';
+  let password = '';
+  const raw = crypto.randomBytes(24);
+  for (let i = 0; i < 20; i++) password += alphabet[raw[i] % alphabet.length];
+  const a = { password: process.env.SB_PASSWORD || password, secret: crypto.randomBytes(32).toString('hex') };
   try { fs.writeFileSync(authFile(), JSON.stringify(a, null, 2)); a.generated = true; } catch {}
   return a;
 }
@@ -387,11 +389,30 @@ function lanAddresses() {
   }
   return out;
 }
+// Exposing this to the internet with a weak password would be a bad idea, so
+// make that an explicit choice.
+if (process.env.SB_REQUIRE_PASSWORD === '1' && AUTH.generated) {
+  console.error('\n  Refusing to start: set SB_PASSWORD before exposing this to the internet.');
+  console.error('  Example (PowerShell):  $env:SB_PASSWORD="something long and private"\n');
+  process.exit(1);
+}
+server.on('error', (e) => {
+  if (e && e.code === 'EADDRINUSE') {
+    console.error(`\n  Port ${PORT} is already in use — Sailing Books may already be running,`);
+    console.error(`  or another program has it. Try another port:  set SB_PORT=9000 && npm run server\n`);
+  } else if (e && e.code === 'EACCES') {
+    console.error(`\n  Not allowed to listen on port ${PORT}. Try a port above 1024:  set SB_PORT=9000\n`);
+  } else {
+    console.error('\n  Server error:', e && e.message ? e.message : e, '\n');
+  }
+  process.exit(1);
+});
 server.listen(PORT, HOST, () => {
   console.log('\n  Sailing Books — library server');
   console.log('  ------------------------------------------------');
   console.log(`  On this laptop:  http://localhost:${PORT}`);
-  for (const a of lanAddresses()) console.log(`  On your phone:   http://${a}:${PORT}`);
+  for (const a of lanAddresses()) console.log(`  On your phone:   http://${a}:${PORT}   (same Wi-Fi)`);
   console.log(`\n  Password: ${AUTH.password}${AUTH.generated ? '   (generated — saved to ' + authFile() + ')' : '   (SB_PASSWORD)'}`);
-  console.log('  Phone and laptop must be on the same Wi-Fi.\n');
+  if (!process.env.SB_PASSWORD) console.log('  Want to reach it from anywhere? Run:  npm run tunnel');
+  console.log('  The laptop must stay on and awake while the phone is reading.\n');
 });

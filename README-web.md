@@ -13,9 +13,9 @@ It prints something like:
 
 ```
   On this laptop:  http://localhost:8787
-  On your phone:   http://192.168.1.106:8787
+  On your phone:   http://192.168.1.106:8787   (same Wi-Fi)
 
-  Password: 4f2a91c7   (generated — saved to web-auth.json)
+  Password: 4f2a91c7kd83mz10   (generated — saved to web-auth.json)
 ```
 
 Open the **phone** address in the phone's browser, type that password, done.
@@ -28,6 +28,34 @@ set SB_PASSWORD=my-password
 set SB_PORT=9000
 npm run server
 ```
+
+## Using it from any network (not just your Wi-Fi)
+
+Same Wi-Fi is only the simplest option. To read from mobile data, a hotel
+Wi-Fi, or anywhere else, put a tunnel in front of the server:
+
+```
+winget install --id Cloudflare.cloudflared   (once)
+npm run tunnel
+```
+
+It starts the server **and** prints a public HTTPS address like
+`https://something.trycloudflare.com`. Type that into the phone's browser from
+anywhere and sign in with the same password. The books still stream from your
+laptop — the tunnel only forwards the connection.
+
+- The address is different every time you run it (that's fine, it's a quick
+  tunnel). For a permanent address, create a named Cloudflare Tunnel and a
+  free `trycloudflare`-style hostname.
+- **The laptop must be on, awake, and running this** while the phone reads.
+  On Windows, set *Settings → Power → Screen and sleep → When plugged in, sleep
+  after: Never* if you read for long periods.
+- Because the address is public, use a password only you know. The generated
+  one is long; if you set your own, make it long too. To refuse to start
+  without an explicit password: `set SB_REQUIRE_PASSWORD=1`.
+- Tailscale is the other good option — install it on the laptop *and* the
+  phone, and the server is only reachable on your private network, never
+  publicly at all. Use `npm run server` and the Tailscale IP.
 
 ## Notes
 

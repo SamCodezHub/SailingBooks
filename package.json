@@ -9,6 +9,7 @@
   "scripts": {
     "start": "electron .",
     "server": "node server/server.js",
+    "tunnel": "node server/tunnel.js",
     "dist": "electron-builder --win",
     "dist-all": "electron-builder -w -m -l"
   },
