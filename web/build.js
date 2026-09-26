@@ -33,6 +33,23 @@ fs.writeFileSync(path.join(OUT, 'api-shim.js'), read(path.join(__dirname, 'api-s
 fs.writeFileSync(path.join(OUT, 'login.js'), read(path.join(__dirname, 'login.js')));
 fs.writeFileSync(path.join(OUT, 'vercel.json'), JSON.stringify({ cleanUrls: true }, null, 2));
 
+// index.html and the PDF worker reach for ../node_modules/... — on a static
+// host that resolves to /node_modules/..., so the libraries have to travel with
+// the bundle or EPUBs and PDFs silently break.
+const VENDOR = [
+  ['node_modules/jszip/dist/jszip.min.js', 'node_modules/jszip/dist/jszip.min.js'],
+  ['node_modules/pdfjs-dist/build/pdf.js', 'node_modules/pdfjs-dist/build/pdf.js'],
+  ['node_modules/pdfjs-dist/build/pdf.worker.js', 'node_modules/pdfjs-dist/build/pdf.worker.js']
+];
+for (const [from, to] of VENDOR) {
+  const src = path.join(ROOT, from);
+  const dest = path.join(OUT, to);
+  if (!fs.existsSync(src)) { console.warn('  missing (skipped): ' + from); continue; }
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(src, dest);
+  console.log('  + ' + to + '  ' + (fs.statSync(dest).size / 1024).toFixed(0) + ' kB');
+}
+
 console.log('Static client written to ' + OUT);
 console.log('Files:');
 for (const f of fs.readdirSync(OUT)) console.log('  ' + f);

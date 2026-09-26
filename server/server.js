@@ -232,6 +232,15 @@ function send(res, code, body, headers = {}) {
 const sendJson = (res, code, obj) =>
   send(res, code, JSON.stringify(obj), { 'content-type': 'application/json; charset=utf-8' });
 
+// The client may be hosted elsewhere (Vercel), so it calls us from another
+// origin. Auth is a bearer token rather than a cookie, so a wildcard is safe.
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers': 'content-type, x-sb-token',
+  'access-control-max-age': '86400'
+};
+
 function readBody(req, limit = 1e6) {
   return new Promise((resolve, reject) => {
     let size = 0; const parts = [];
@@ -307,6 +316,14 @@ const server = http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, 'http://x'); } catch { return send(res, 400, 'Bad request'); }
   const p = url.pathname;
+
+  // Preflight, and CORS on everything (the client may live on Vercel).
+  res.setHeader('access-control-allow-origin', CORS['access-control-allow-origin']);
+  res.setHeader('access-control-allow-methods', CORS['access-control-allow-methods']);
+  res.setHeader('access-control-allow-headers', CORS['access-control-allow-headers']);
+  res.setHeader('access-control-max-age', CORS['access-control-max-age']);
+  res.setHeader('timing-allow-origin', '*');
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
   // ---- login ----
   if (p === '/api/login' && req.method === 'POST') {
