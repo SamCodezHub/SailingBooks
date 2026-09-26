@@ -1,0 +1,10 @@
+# Vercel builds this project itself (see vercel.json: installCommand +
+# buildCommand), so the local copies of these are dead weight. Without this
+# file the CLI uploads node_modules and dist, which busts the 100 MB limit.
+node_modules/
+dist/
+dist-all/
+web/dist/
+.git/
+*.blockmap
+*.log

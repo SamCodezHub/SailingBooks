@@ -24,3 +24,5 @@ desktop.ini
 library-index.json
 web-auth.json
 web-progress.json
+
+.vercel
