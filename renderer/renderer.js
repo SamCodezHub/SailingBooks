@@ -1788,7 +1788,9 @@ function fmtTime(s) {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
   return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(ss).padStart(2, '0');
 }
-function epubMode() { return state.settings.readMode === 'pages' ? 'pages' : 'scroll'; }
+// The phone always scrolls: paginated columns on a small screen are awkward,
+// and scrolling past the end of a chapter moves on to the next one.
+function epubMode() { return WEB ? 'scroll' : (state.settings.readMode === 'pages' ? 'pages' : 'scroll'); }
 function currentBook() { return state.books.find(x => x.id === currentBookId) || null; }
 
 function captureEpubProgress() {
@@ -1904,6 +1906,7 @@ function jumpToFragment(fragment, paged) {
 }
 
 function setViewMode(m) {
+  if (WEB) return;                          // the phone reads in scroll mode only
   if (state.settings.readMode === m) return;
   captureEpubProgress();
   state.settings.readMode = m;
@@ -1955,7 +1958,7 @@ function updateChapterNav() {
   const audioCh = b.type === 'audio' && audioChapters.length >= 1;
   if (!isEpub && !audioCh) { nav.classList.add('hidden'); return; }
   nav.classList.remove('hidden');
-  $('#viewToggle').classList.toggle('hidden', !isEpub);
+  $('#viewToggle').classList.toggle('hidden', !isEpub || WEB);   // the phone is scroll-only
   $('#pageGroup').classList.toggle('hidden', !(isEpub && epubMode() === 'pages'));
   $('#btnViewScroll').classList.toggle('active', epubMode() === 'scroll');
   $('#btnViewPages').classList.toggle('active', epubMode() === 'pages');
@@ -2081,6 +2084,12 @@ async function openBook(book) {
   $('#epubScroll').classList.toggle('hidden', book.type !== 'epub');
   $('#pdfScroll').classList.toggle('hidden', book.type !== 'pdf');
   $('#audioWrap').classList.toggle('hidden', book.type !== 'audio');
+  if (WEB) {
+    // Remember the phone's clean-reading choice between books.
+    $('#readerView').classList.toggle('immersive', !!state.settings.immersive);
+    const cb = $('#btnClean');
+    if (cb) cb.textContent = state.settings.immersive ? 'Show' : 'Clean';
+  }
 
   if (book.type === 'epub') {
     $('#epubContent').innerHTML = '<p style="color:#999">Loading book…</p>';
@@ -2184,6 +2193,66 @@ function closeReader() {
   $('#libraryView').classList.remove('hidden');
   render();
 }
+
+/* ---------- clean reading: hide every control, tap to bring them back ---------- */
+let immersiveHintT = null;
+function showImmersiveHint() {
+  let h = $('.immersive-hint');
+  if (!h) {
+    h = document.createElement('div');
+    h.className = 'immersive-hint';
+    document.body.appendChild(h);
+  }
+  h.textContent = 'Tap the page to show the controls';
+  h.classList.add('show');
+  clearTimeout(immersiveHintT);
+  immersiveHintT = setTimeout(() => h.classList.remove('show'), 2600);
+}
+function setImmersive(on) {
+  const rv = $('#readerView');
+  if (!rv) return;
+  rv.classList.toggle('immersive', on);
+  const b = $('#btnClean');
+  if (b) { b.classList.toggle('active', on); b.textContent = on ? 'Show' : 'Clean'; }
+  if (on) {
+    // Best effort: on a phone this also drops the browser's own bars.
+    try {
+      const p = rv.requestFullscreen ? rv.requestFullscreen({ navigationUI: 'hide' }) : null;
+      if (p && p.catch) p.catch(() => {});
+    } catch {}
+    if (!WEB) showImmersiveHint();
+  } else if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
+  if (WEB) state.settings.immersive = !!on;
+  if (WEB) save();
+}
+function toggleImmersive() { setImmersive(!$('#readerView').classList.contains('immersive')); }
+$('#btnClean').onclick = toggleImmersive;
+
+// Tap anywhere in the text/player area toggles the controls in clean mode.
+// Ignored while a real drag or a scroll gesture is happening.
+let immersiveTapT = 0;
+document.addEventListener('pointerdown', (e) => {
+  const rv = $('#readerView');
+  if (!rv || !rv.classList.contains('immersive')) return;
+  if (e.target.closest('button, select, input, a, .node-book, .flow-remove')) return;
+  const y = e.clientY;
+  const start = performance.now();
+  const onUp = (ev) => {
+    document.removeEventListener('pointerup', onUp, true);
+    if (Math.abs(ev.clientY - y) > 12 || performance.now() - start > 600) return; // it was a scroll
+    setImmersive(false);
+  };
+  document.addEventListener('pointerup', onUp, true);
+}, true);
+document.addEventListener('fullscreenchange', () => {
+  // Leaving fullscreen some other way (Esc on desktop) keeps the page in step.
+  const rv = $('#readerView');
+  if (rv && !document.fullscreenElement && rv.classList.contains('immersive') && WEB) {
+    setImmersive(false);
+  }
+});
 
 /* ---------- fullscreen reader ---------- */
 function toggleFullscreen() {
@@ -2518,16 +2587,54 @@ $('#epubScroll').addEventListener('wheel', (e) => {
 
 // persist epub progress
 $('#epubScroll').addEventListener('scroll', () => {
+  const sc = $('#epubScroll');
   clearTimeout(saveScrollT);
   saveScrollT = setTimeout(() => {
     const b = state.books.find(x => x.id === currentBookId);
     if (!b || b.type !== 'epub') return;
-    const sc = $('#epubScroll');
     const max = sc.scrollHeight - sc.clientHeight;
     b.progress = max > 0 ? sc.scrollTop / max : 0;
     save();
   }, 400);
 }, { passive: true });
+
+// On the phone, keep scrolling at the end of a chapter and it turns the page —
+// same at the top going back. Driven by the gesture, not by reaching the end,
+// so the last line of a chapter is never skipped.
+let edgeBase = null;
+function epubAtEnd() {
+  const sc = $('#epubScroll');
+  const max = sc.scrollHeight - sc.clientHeight;
+  return max <= 2 || sc.scrollTop >= max - 2;
+}
+function epubAtTop() {
+  const sc = $('#epubScroll');
+  return sc.scrollTop <= 2;
+}
+function epubRoll(dir) {
+  if (!WEB || !epubState || currentBookId !== epubState.book.id) return false;
+  if (dir > 0) {
+    if (!epubAtEnd() || epubState.idx >= epubState.chapters.length - 1) return false;
+    gotoEpubChapter(epubState.idx + 1);
+    return true;
+  }
+  if (!epubAtTop() || epubState.idx <= 0) return false;
+  gotoEpubChapter(epubState.idx - 1, '', true);
+  return true;
+}
+$('#epubScroll').addEventListener('wheel', (e) => {
+  if (e.ctrlKey || e.metaKey) return;                 // Ctrl+wheel is still font size
+  if (e.deltaY > 0 && epubRoll(1)) { e.preventDefault(); edgeBase = null; }
+  else if (e.deltaY < 0 && epubRoll(-1)) { e.preventDefault(); edgeBase = null; }
+}, { passive: false });
+$('#epubScroll').addEventListener('touchstart', (e) => { edgeBase = e.touches[0].clientY; }, { passive: true });
+$('#epubScroll').addEventListener('touchmove', (e) => {
+  if (edgeBase === null || !e.touches.length) return;
+  const dy = edgeBase - e.touches[0].clientY;        // finger up = scroll down
+  if (Math.abs(dy) < 42) return;
+  const dir = dy > 0 ? 1 : -1;
+  if (epubRoll(dir)) { e.preventDefault(); edgeBase = e.touches[0].clientY; }
+}, { passive: false });
 
 $('#btnBack15').onclick = () => { readerStep(-1); };
 $('#btnFwd30').onclick = () => { readerStep(1); };

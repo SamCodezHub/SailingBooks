@@ -175,6 +175,24 @@ body {
 #readerTitle { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #readerMeta { font-size: 12px; color: var(--muted); }
 #readerControls .font-group { display: flex; align-items: center; gap: 7px; }
+
+/* Phone: the reader bar has more controls than fits, so the title keeps the
+   top row and the controls scroll sideways underneath it — otherwise Clean and
+   Full end up off-screen where they cannot be tapped. */
+@media (max-width: 620px) {
+  #readerBar { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
+  #readerTitleWrap { flex: 1 1 auto; order: 1; }
+  #readerBar > #btnBack { order: 0; }
+  #readerBar > #btnClean, #readerBar > #btnFullscreen { order: 2; }
+  #readerControls {
+    order: 3; flex: 1 0 100%; overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch; padding-bottom: 2px;
+  }
+  #readerControls .font-group, #readerControls .hidden { display: flex; }
+  #readerControls .hidden { display: none !important; }
+  #chapterNav { padding: 8px 12px; overflow-x: auto; flex-wrap: nowrap; }
+  #epubContent { padding: 26px 18px 90px; }
+}
 #fontSizeLabel { font-size: 12px; color: var(--muted); min-width: 38px; text-align: center; }
 #readerControls select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 13px; background: #fff; }
 
@@ -280,6 +298,19 @@ body {
   max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* Clean reading (phone): hide every control, tap the page to get them back. */
+#readerView.immersive #readerBar,
+#readerView.immersive #chapterNav { display: none; }
+#readerView.immersive #audioWrap { padding-top: 0; align-items: center; }
+#readerView.immersive .audio-card { border: 0; box-shadow: none; padding: 16px; }
+#readerView.immersive .audio-note { display: none; }
+#readerView.immersive #epubScroll { padding-top: 22px; }
+.immersive-hint {
+  position: fixed; z-index: 40; left: 50%; bottom: 22px; transform: translateX(-50%);
+  background: rgba(26,26,26,.86); color: #fff; font-size: 12.5px; padding: 8px 14px;
+  border-radius: 999px; pointer-events: none; opacity: 0; transition: opacity .25s ease;
+}
+.immersive-hint.show { opacity: 1; }
 /* Reader fullscreen — position must be restated: #readerView is position:relative
    in normal flow, and an author rule beats the UA's :fullscreen position:fixed,
    which left the top of the screen showing the library behind it. */

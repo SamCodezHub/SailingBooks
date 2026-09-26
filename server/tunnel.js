@@ -123,6 +123,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 // (terms of use, docs links) must never be mistaken for it.
 const MATCHERS = {
   cloudflare: (line) => /(https:\/\/[a-z0-9-]+\.trycloudflare\.com)/i.exec(line),
+  ngrok: (line) => /(https:\/\/[a-z0-9-]+\.(?:ngrok\.com|ngrok-free\.app|ngrok\.io))/i.exec(line),
   ssh: (line) => /tunneled[^,]*,\s*(https:\/\/[^\s]+)/i.exec(line)
 };
 function findUrl(text, mode) {
@@ -179,6 +180,16 @@ function instructions() {
   if (exe) {
     console.log('  Opening a public address with Cloudflare…\n');
     watch(spawn(exe, ['tunnel', '--url', `http://localhost:${PORT}`], { stdio: ['ignore', 'pipe', 'pipe'] }), 'Cloudflare', 'cloudflare');
+    return;
+  }
+  // ngrok gives the SAME address every run once you have a free account and an
+  // authtoken, which is the only way to have one bookmark that never changes.
+  if (have('ngrok')) {
+    const token = process.env.NGROK_AUTHTOKEN;
+    const args = ['http', String(PORT), '--log=stdout'];
+    if (token) args.push('--authtoken', token);
+    console.log('  Opening a stable address with ngrok…\n');
+    watch(spawn('ngrok', args, { stdio: ['ignore', 'pipe', 'pipe'] }), 'ngrok', 'ngrok');
     return;
   }
   if (spawnSync(IS_WIN ? 'where' : 'which', ['ssh'], { stdio: 'ignore' }).status === 0) {

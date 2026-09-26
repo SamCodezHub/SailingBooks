@@ -4,6 +4,7 @@ node_modules/
 # build output
 dist/
 dist-all/
+web/dist/
 *.blockmap
 release/
 

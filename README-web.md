@@ -63,6 +63,53 @@ the tunnel only forwards the connection.
   phone, and the server is only reachable on your private network, never
   publicly at all. Use `npm run server` and the Tailscale IP.
 
+## One address that never changes (and Vercel)
+
+A quick tunnel changes its address every run, which is fine for a quick look
+but useless as a bookmark. Two ways to get one permanent address:
+
+**ngrok (free, easiest).** Create a free account at ngrok.com, copy your
+authtoken, then:
+
+```
+set NGROK_AUTHTOKEN=your-token-here
+npm run tunnel
+```
+
+`npm run tunnel` uses ngrok automatically when it is installed
+(`winget install --id ngrok.ngrok`) — you get the same `https://xxx.ngrok-free.app`
+address every single time.
+
+**A named Cloudflare Tunnel (free, needs a domain).** If you own a domain and
+point it at Cloudflare, create a named tunnel and its hostname never changes.
+
+**Vercel.** The client is plain static files, so the front end can live on
+Vercel and point at the laptop. Build the bundle with:
+
+```
+node web/build.js
+```
+
+which writes `web/dist/` (index.html with the sign-in gate inlined, the api
+shim, the reader and styles). Deploy it at vercel.com/new by dragging that
+folder in, or `npx vercel deploy`.
+
+That gives you **one Vercel address** to bookmark. The tunnel address is typed
+once into the **Laptop address** box on the sign-in screen and remembered on
+the device, so the two are separate: Vercel is the front door, the tunnel is
+the way through to the laptop.
+
+## Reading on the phone
+
+- **Clean** in the reader bar hides every control (title, chapters, pages,
+  scroll bar) and asks the phone for real full screen. **Tap the page** to bring
+  them back. The choice is remembered for the next book.
+- EPUBs always open in **scroll mode** on the phone — no paginated columns.
+- **Keep scrolling at the end of a chapter and it turns the page** (and the same
+  at the top, going back). Reaching the end on its own never skips anything.
+- Audiobooks keep their chapter list, and the arrows skip forward/back with the
+  same chapter roll-over.
+
 ## Notes
 
 - **The desktop app must have been opened at least once** so the library index
