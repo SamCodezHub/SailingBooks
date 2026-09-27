@@ -2043,6 +2043,281 @@ async function refreshMissingChapters(limit = 15) {
   return found;
 }
 
+/* ---------- Sailing Books Archives (private, stored on the laptop) ---------- */
+let archiveView = null;   // null = not open, otherwise {items, sets, selected:Set, busy}
+
+function archivesAvailable() { return !!(window.api && window.api.archiveList); }
+
+async function openArchives() {
+  if (!archivesAvailable()) { toast('Archives need the laptop server (npm run tunnel)'); return; }
+  $('#libraryView').classList.remove('hidden');
+  $('#archiveView').classList.remove('hidden');
+  $('#shelfSection').style.display = 'none';
+  $('#booksSection').style.display = 'none';
+  $('#orderSection').classList.add('hidden');
+  archiveView = { items: [], sets: [], selected: new Set(), busy: false };
+  renderArchives();
+  try {
+    const data = await window.api.archiveList();
+    if (archiveView) { archiveView.items = data.items || []; archiveView.sets = data.sets || []; }
+  } catch (e) {
+    if (archiveView) archiveView.error = e.message || 'Could not reach the archive';
+  }
+  renderArchives();
+}
+function closeArchives() {
+  archiveView = null;
+  $('#archiveView').classList.add('hidden');
+  $('#shelfSection').style.display = '';
+  $('#booksSection').style.display = '';
+  if (state.currentFolderId) $('#orderSection').classList.remove('hidden');
+}
+
+function fmtBytes(n) {
+  if (!isFinite(n) || n <= 0) return '';
+  const u = ['B', 'KB', 'MB', 'GB'];
+  let i = 0, v = n;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return ' · ' + (v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1)) + ' ' + u[i];
+}
+function fmtClock(s) {
+  if (!isFinite(s) || s < 0) return '';
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = Math.floor(s % 60);
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`;
+}
+
+function renderArchives() {
+  const body = $('#archiveBody');
+  if (!body || !archiveView) return;
+  const acts = $('#archiveActions');
+  acts.innerHTML = '';
+  const btn = (label, title, fn, cls) => {
+    const b = document.createElement('button');
+    b.className = 'btn small ghost' + (cls ? ' ' + cls : '');
+    b.textContent = label; b.title = title; b.onclick = fn;
+    acts.appendChild(b);
+  };
+  btn('← Library', 'Back to your library', closeArchives);
+  btn('Upload books', 'Send books to the archive on your laptop', archiveUpload);
+  const sel = archiveView.selected.size;
+  btn(sel ? `New set (${sel})` : 'New set', 'Group the ticked books into a set', archiveCreateSet, 'primary');
+
+  body.innerHTML = '';
+  if (archiveView.error) {
+    const e = document.createElement('div');
+    e.className = 'arc-error';
+    e.textContent = archiveView.error;
+    body.appendChild(e);
+    return;
+  }
+
+  // --- sets ---
+  const h1 = document.createElement('h3');
+  h1.className = 'arc-head';
+  h1.textContent = archiveView.sets.length ? `Sets (${archiveView.sets.length})` : 'Sets';
+  body.appendChild(h1);
+  if (!archiveView.sets.length) {
+    const p = document.createElement('div');
+    p.className = 'arc-empty';
+    p.textContent = 'No sets yet. Tick some books below and press “New set”.';
+    body.appendChild(p);
+  }
+  for (const s of archiveView.sets) {
+    const card = document.createElement('div');
+    card.className = 'arc-set';
+    const mins = (s.items || []).reduce((a, b) => a + (b.duration || 0), 0);
+    card.innerHTML = `
+      <div class="arc-bar" style="background:${escapeHtml(s.color || '#eee')}"></div>
+      <div class="arc-main">
+        <div class="arc-name">${escapeHtml(s.name)}</div>
+        <div class="arc-sub">${(s.items || []).length} book${(s.items || 1) === 1 ? '' : 's'}${mins ? ' · ' + fmtClock(mins) : ''} · ${(s.nodes || []).length} node${(s.nodes || []).length === 1 ? '' : 's'}${s.installedAt ? ' · installed' : ''}</div>
+      </div>
+      <div class="arc-btns"></div>`;
+    const box = card.querySelector('.arc-btns');
+    const mk = (label, title, fn, primary) => {
+      const b = document.createElement('button');
+      b.className = 'btn small ' + (primary ? 'primary' : 'ghost');
+      b.textContent = label; b.title = title; b.onclick = fn;
+      box.appendChild(b);
+    };
+    mk('Install', 'Copy these books into your library with this folder and flowchart', async () => {
+      if (archiveView.busy) return;
+      archiveView.busy = true; renderArchives();
+      try {
+        const r = await window.api.archiveInstall(s.id);
+        toast(r.added ? `Installed ${r.added} book${r.added === 1 ? '' : 's'} into “${s.name}”` : 'Already in your library');
+        await syncArchiveInstall();
+      } catch (e) { toast('Install failed: ' + (e.message || e)); }
+      archiveView.busy = false;
+      const data = await window.api.archiveList().catch(() => null);
+      if (data && archiveView) { archiveView.items = data.items || []; archiveView.sets = data.sets || []; }
+      renderArchives();
+    }, true);
+    if (archivesAvailable()) {
+      const a = document.createElement('a');
+      a.className = 'btn small ghost';
+      a.textContent = 'Download';
+      a.title = 'Save the whole set as one zip (books + a manifest with the flowchart)';
+      a.href = window.api.archiveZipUrl(s.id);
+      a.download = (s.name || 'set') + '-sailing-books.zip';
+      box.appendChild(a);
+    }
+    mk('Delete', 'Remove this set from the archive (books already installed stay)', async () => {
+      if (!confirm(`Remove the set “${s.name}” from the archive?`)) return;
+      await window.api.archiveDeleteSet(s.id).catch(() => {});
+      archiveView.sets = archiveView.sets.filter(x => x.id !== s.id);
+      renderArchives();
+    });
+    body.appendChild(card);
+  }
+
+  // --- items ---
+  const h2 = document.createElement('h3');
+  h2.className = 'arc-head';
+  h2.textContent = `Books in the archive (${archiveView.items.length})`;
+  body.appendChild(h2);
+  if (!archiveView.items.length) {
+    const p = document.createElement('div');
+    p.className = 'arc-empty';
+    p.textContent = 'The archive is empty. Press “Upload books” to send some over.';
+    body.appendChild(p);
+    return;
+  }
+  const grid = document.createElement('div');
+  grid.className = 'arc-grid';
+  for (const it of archiveView.items) {
+    const el = document.createElement('label');
+    el.className = 'arc-item' + (archiveView.selected.has(it.id) ? ' sel' : '');
+    const ch = (it.chapters && it.chapters.length) ? it.chapters.length + ' chapters' : '';
+    el.innerHTML = `
+      <input type="checkbox" ${archiveView.selected.has(it.id) ? 'checked' : ''}>
+      <div>
+        <div class="arc-name">${escapeHtml(it.title || it.fileName)}</div>
+        <div class="arc-sub">${escapeHtml([it.type === 'audio' ? 'Audio' : it.type === 'pdf' ? 'PDF' : 'EPUB', ch, fmtBytes(it.size)].filter(Boolean).join(' · '))}</div>
+      </div>`;
+    el.querySelector('input').onchange = (e) => {
+      if (e.target.checked) archiveView.selected.add(it.id); else archiveView.selected.delete(it.id);
+      renderArchives();
+    };
+    el.oncontextmenu = (e) => {
+      e.preventDefault();
+      showMenu(e.clientX, e.clientY, [
+        { label: 'Delete from archive', danger: true, action: async () => {
+          if (!confirm(`Delete “${it.title || it.fileName}” from the archive?`)) return;
+          await window.api.archiveDeleteItem(it.id).catch(() => {});
+          archiveView.items = archiveView.items.filter(x => x.id !== it.id);
+          renderArchives();
+        } }
+      ]);
+    };
+    grid.appendChild(el);
+  }
+  body.appendChild(grid);
+}
+
+function archiveUpload() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.accept = '.epub,.pdf,.mp3,.m4a,.m4b,.wav,.ogg,.opus,.flac,.aac';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async () => {
+    const files = [...(input.files || [])];
+    input.remove();
+    if (!files.length) return;
+    archiveView.busy = true;
+    toast(files.length === 1 ? 'Uploading…' : `Uploading ${files.length} books…`);
+    renderArchives();
+    let ok = 0;
+    for (const f of files) {
+      try { await window.api.archiveUpload(f); ok++; }
+      catch (e) { toast(`${f.name}: ${e.message || 'failed'}`); }
+    }
+    archiveView.busy = false;
+    const data = await window.api.archiveList().catch(() => null);
+    if (data && archiveView) { archiveView.items = data.items || []; archiveView.sets = data.sets || []; }
+    toast(ok ? `Sent ${ok} book${ok === 1 ? '' : 's'} to the archive` : 'Upload failed');
+    renderArchives();
+  };
+  input.click();
+}
+
+async function archiveCreateSet() {
+  const ids = archiveView ? [...archiveView.selected] : [];
+  if (!ids.length) { toast('Tick some books first'); return; }
+  const name = prompt('Name for this set', 'My set');
+  if (!name || !name.trim()) return;
+  // A set can carry the flowchart of a folder you already have.
+  const folders = state.folders.filter(f => (f.nodes && f.nodes.length) || (f.edges && f.edges.length));
+  let nodes = [], edges = [], sections = [], color = PALETTE[0];
+  if (folders.length) {
+    const pick = prompt('Copy the flowchart from which folder?\n\n' +
+      folders.map((f, i) => (i + 1) + '. ' + f.name).join('\n') +
+      '\n\nLeave empty for a plain set of books.', '');
+    if (pick && pick.trim()) {
+      const f = folders[+pick.trim() - 1];
+      if (f) {
+        nodes = f.nodes || []; edges = f.edges || []; sections = f.sections || [];
+        color = f.color || color;
+      }
+    }
+  }
+  try {
+    await window.api.archiveCreateSet({ name: name.trim(), color, itemIds: ids, nodes, edges, sections });
+    archiveView.selected.clear();
+    const data = await window.api.archiveList();
+    archiveView.items = data.items || [];
+    archiveView.sets = data.sets || [];
+    toast('Set created');
+  } catch (e) { toast('Could not create the set: ' + (e.message || e)); }
+  renderArchives();
+}
+
+// After installing a set, pull the new books/folder in (phone reads the index
+// directly; the desktop app merges it here).
+async function syncArchiveInstall() {
+  if (WEB) { try { await hydrateFromServer(); render(); } catch {} return; }
+  try { await adoptLibraryFiles(); } catch {}
+}
+
+$('#btnArchives').onclick = () => {
+  if (!$('#archiveView').classList.contains('hidden')) closeArchives();
+  else openArchives();
+};
+
+// An Archives "Install" writes folders and file placements into
+// library-index.json; pick them up so an installed set arrives with its
+// folder and flowchart rather than as loose files.
+async function syncLibraryFromIndex() {
+  if (WEB || !window.api?.getLibraryIndex) return false;
+  let idx;
+  try { idx = await window.api.getLibraryIndex(); } catch { return false; }
+  if (!idx || !Array.isArray(idx.folders)) return false;
+  let changed = false;
+  const have = new Set(state.folders.map(f => f.id));
+  for (const f of idx.folders) {
+    if (!f || !f.id || have.has(f.id)) continue;
+    state.folders.push({
+      id: f.id, name: f.name || 'Folder', color: f.color || '#eee',
+      createdAt: f.createdAt || Date.now(),
+      nodes: Array.isArray(f.nodes) ? f.nodes : [], edges: Array.isArray(f.edges) ? f.edges : [],
+      sections: Array.isArray(f.sections) ? f.sections : []
+    });
+    have.add(f.id);
+    changed = true;
+  }
+  // file a book into the folder the index says it belongs to
+  const byPath = new Map();
+  for (const b of idx.books || []) if (b && b.storedPath) byPath.set(String(b.storedPath).toLowerCase(), b);
+  for (const b of state.books) {
+    const rec = byPath.get(String(b.storedPath || '').toLowerCase());
+    if (rec && rec.folderId && b.folderId !== rec.folderId) { b.folderId = rec.folderId; changed = true; }
+  }
+  if (changed) { save(); render(); }
+  return changed;
+}
+
 /* ---------- reader ---------- */
 function applyReaderStyle() {
   const c = $('#epubContent');
@@ -2759,6 +3034,8 @@ function startApp() {
     // Auto-adopt files already sitting in the app library folder
     // (e.g. copied there from Thorium Reader) that aren't tracked yet.
     adoptLibraryFiles();
+    // …and pick up anything an Archives install put there for us.
+    syncLibraryFromIndex().then(changed => { if (changed) toast('New set added to your library'); }).catch(() => {});
   })();
 }
 if (WEB) {

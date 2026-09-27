@@ -77,6 +77,12 @@ ipcMain.handle('get-library-dir', () => libraryDir());
 
 // The phone/web client reads the library through server/server.js, which cannot
 // see the renderer's localStorage. So the app mirrors its book list here.
+ipcMain.handle('get-library-index', () => {
+  try {
+    const idx = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'library-index.json'), 'utf8'));
+    return { books: Array.isArray(idx.books) ? idx.books : [], folders: Array.isArray(idx.folders) ? idx.folders : [] };
+  } catch { return { books: [], folders: [] }; }
+});
 ipcMain.handle('save-library-index', (event, index) => {
   try {
     if (!index || !Array.isArray(index.books)) return false;

@@ -13,6 +13,7 @@
   <!-- ===== Top bar ===== -->
   <header id="topbar">
     <input id="searchInput" type="search" placeholder="Search books…" autocomplete="off" />
+    <button id="btnArchives" class="topbar-btn" title="Sailing Books Archives — books and sets stored on your laptop">Archives</button>
   </header>
 
   <!-- ===== Library view ===== -->
@@ -45,6 +46,15 @@
     <section id="booksSection">
       <h2 class="section-title" id="booksTitle">Books</h2>
       <div id="booksGrid"></div>
+    </section>
+
+    <section id="archiveView" class="hidden">
+      <div id="archiveHead">
+        <h2 class="section-title">Archives</h2>
+        <div id="archiveActions"></div>
+      </div>
+      <div id="archiveHint" class="lib-hint">Books and sets stored on your laptop</div>
+      <div id="archiveBody"></div>
     </section>
 
     <section id="orderSection" class="hidden">

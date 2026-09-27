@@ -106,6 +106,33 @@
       return this.req('/book/' + encodeURIComponent(id) + '/progress', { method: 'POST', json: patch });
     },
     async fetchLibrary() { return this.api('/library'); },
+
+    /* ---- Sailing Books Archives (stored on the laptop) ---- */
+    async archiveLogin(username, password) {
+      const r = await fetch(this.url('/api/archive/login'), {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.token) throw new Error(data.error || 'Wrong username or password');
+      localStorage.setItem(LS.token, data.token);
+      return data;
+    },
+    async archiveList() { return this.api('/archive'); },
+    async archiveUpload(file) {
+      const r = await fetch(this.url('/api/archive/upload?name=' + encodeURIComponent(file.name)), {
+        method: 'POST', headers: Object.assign({ 'content-type': 'application/octet-stream' }, this.headers()),
+        body: file
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Upload failed');
+      return data;
+    },
+    async archiveCreateSet(set) { return this.req('/archive/set', { method: 'POST', json: set }).then(r => r.json()); },
+    async archiveInstall(id) { return this.req('/archive/install/' + encodeURIComponent(id), { method: 'POST' }).then(r => r.json()); },
+    async archiveDeleteItem(id) { return this.req('/archive/item/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => r.json()); },
+    async archiveDeleteSet(id) { return this.req('/archive/set/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => r.json()); },
+    archiveZipUrl(id) { return this.url('/api/archive/zip/' + encodeURIComponent(id)) + this.auth(); },
     async removeCover(bookId) {
       try {
         await fetch(this.url('/api/book/' + encodeURIComponent(bookId) + '/cover') + this.auth(), { method: 'DELETE' });

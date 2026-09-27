@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('api', {
   getLibraryDir: () => ipcRenderer.invoke('get-library-dir'),
   // Mirror of the library for the web/phone client served by server/server.js
   saveLibraryIndex: (index) => ipcRenderer.invoke('save-library-index', index),
+  // Lets the app pick up folders/placements written by the Archives installer
+  getLibraryIndex: () => ipcRenderer.invoke('get-library-index'),
   importFiles: (paths) => ipcRenderer.invoke('import-files', paths),
   pickFiles: () => ipcRenderer.invoke('pick-files'),
   deleteFile: (p) => ipcRenderer.invoke('delete-file', p),
