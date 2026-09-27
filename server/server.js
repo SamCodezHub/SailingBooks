@@ -169,7 +169,12 @@ function publicBooks() {
       duration: b.duration || 0,
       userRenamed: !!b.userRenamed,
       storedPath: inLibrary ? 'id:' + b.id : null,     // shim maps this to /api/book/:id/file
-      coverPath: b.coverPath && safeInside(COVERS_DIR, b.coverPath) ? 'id:' + b.id : null
+      // Covers are addressed by the book id through their own endpoint, not by
+      // path. Sending "id:<id>" here used to be read as the book *file*, so
+      // every cover pointed at the EPUB, failed to decode as an image and was
+      // removed by onerror — which is why no covers appeared in the browser.
+      coverPath: null,
+      hasCover: !!(b.coverPath && safeInside(COVERS_DIR, b.coverPath))
     };
   }).filter(b => b.storedPath);
   return { books, folders: idx.folders || [] };
@@ -288,6 +293,10 @@ async function sendFile(req, res, file, mime) {
 
 /* ---------------- static client ---------------- */
 let clientCache = new Map();
+// The client is the app. If a phone is allowed to hold on to renderer.js, a fix
+// that has already shipped never reaches it and it looks like nothing happened,
+// so these are always re-fetched. Only the third-party libraries are cacheable.
+const CLIENT_NOSTORE = { 'cache-control': 'no-store, must-revalidate' };
 async function serveClient(res, urlPath) {
     if (urlPath === '/' || urlPath === '/index.html') {
       let html = clientCache.get('index.html');
@@ -304,7 +313,7 @@ async function serveClient(res, urlPath) {
         html = html.replace('<head>', '<head>\n<script>window.SB_SERVED_BY_LAPTOP=1;</script>');
         clientCache.set('index.html', html);
       }
-      return send(res, 200, html, { 'content-type': MIME['.html'] });
+      return send(res, 200, html, Object.assign({ 'content-type': MIME['.html'] }, CLIENT_NOSTORE));
     }
   // The client pulls its libraries from the same place as the desktop app.
   const map = {
@@ -322,7 +331,11 @@ async function serveClient(res, urlPath) {
     return send(res, 404, 'Not found');
   }
   const body = await fsp.readFile(file);
-  send(res, 200, body, { 'content-type': mimeOf(file) });
+  const isVendor = urlPath.startsWith('/node_modules/');
+  send(res, 200, body, Object.assign(
+    { 'content-type': mimeOf(file) },
+    isVendor ? { 'cache-control': 'public, max-age=604800' } : CLIENT_NOSTORE
+  ));
 }
 
 /* ---------------- routing ---------------- */

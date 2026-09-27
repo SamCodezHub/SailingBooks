@@ -137,6 +137,17 @@ ipcMain.handle('read-file-buffer', async (event, storedPath) => {
   return data.toString('base64');
 });
 
+// The same file as raw bytes. EPUB parsing wants bytes, and base64 costs a third
+// more memory plus a copy for every book opened.
+ipcMain.handle('read-file-bytes', async (event, storedPath) => {
+  try {
+    const data = fs.readFileSync(storedPath);
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  } catch (e) {
+    throw new Error('Could not read the file: ' + (e && e.message ? e.message : e));
+  }
+});
+
 ipcMain.handle('delete-file', async (event, storedPath) => {
   try {
     if (storedPath && fs.existsSync(storedPath)) fs.unlinkSync(storedPath);

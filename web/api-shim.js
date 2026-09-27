@@ -71,6 +71,14 @@
       }
       return id;
     },
+    // A cover is fetched by the book id through its own endpoint, never through
+    // the book file. It has to be a usable URL straight away because <img>
+    // cannot send the auth header, so the token rides in the query string.
+    coverUrl(book) {
+      if (!book || !book.id) return '';
+      if (book.hasCover === false) return '';
+      return this.url('/api/book/' + encodeURIComponent(book.id) + '/cover') + this.auth();
+    },
     auth() {
       const tok = localStorage.getItem(LS.token);
       return tok ? '?token=' + encodeURIComponent(tok) : '';
@@ -87,6 +95,15 @@
         fr.onerror = () => reject(new Error('Could not read the file'));
         fr.readAsDataURL(blob);
       });
+    },
+    // Straight bytes, no base64 round trip: a 30 MB EPUB costs 30 MB here
+    // instead of 40 MB of string plus the copies that decoding it needs.
+    async readFileBytes(storedPath) {
+      const id = String(storedPath || '');
+      if (!id.startsWith('id:')) return new Uint8Array(0);
+      const r = await fetch(this.fileUrl(id), { headers: this.headers() });
+      if (!r.ok) throw new Error('Could not read the file (' + r.status + ')');
+      return new Uint8Array(await r.arrayBuffer());
     },
     async fileExists(storedPath) { return !!String(storedPath || '').startsWith('id:'); },
     async deleteFile() { return true; },

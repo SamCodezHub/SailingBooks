@@ -1154,6 +1154,17 @@ async function pickAndImport() {
 
 /* ---------- EPUB parsing (offline, via JSZip) ---------- */
 async function zipOf(storedPath) {
+  // Ask for bytes when the client can produce them. A phone used to pull the
+  // whole file as a base64 data URL, which inflates it by a third and makes
+  // several copies in memory — enough to fail on the larger books.
+  if (window.api && window.api.readFileBytes) {
+    try {
+      const bytes = await window.api.readFileBytes(storedPath);
+      if (bytes && bytes.length) return await JSZip.loadAsync(bytes);
+    } catch (e) {
+      console.warn('could not read book as bytes, falling back', e);
+    }
+  }
   const b64 = await window.api.readFileBase64(storedPath);
   const bytes = base64ToBytes(b64);
   return await JSZip.loadAsync(bytes);
@@ -1297,9 +1308,16 @@ function downscaleCover(dataUrl) {
 function revokeEpubUrls() { epubObjectUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch {} }); epubObjectUrls = []; }
 
 /* ---------- covers live as files (never localStorage) + enrichment ---------- */
-// Display URL for a book cover: file-based; legacy inline dataURLs still work.
+// Display URL for a book cover. The two clients disagree on what a cover is: in
+// the app it is a file on this machine, in a browser it is an authenticated API
+// URL. So each api knows how to answer for itself, and asking for the book
+// rather than a path is what stops a browser pointing a cover at the book file.
 function coverSrc(b) {
   if (!b) return '';
+  if (window.api && window.api.coverUrl) {
+    const u = window.api.coverUrl(b);
+    if (u) return u;
+  }
   if (b.coverPath && window.api) return window.api.fileUrl(b.coverPath);
   if (b.cover && String(b.cover).startsWith('data:')) return b.cover;
   return '';

@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('api', {
   saveCover: (bookId, dataUrl) => ipcRenderer.invoke('save-cover', { bookId, dataUrl }),
   getAudioMeta: (p) => ipcRenderer.invoke('get-audio-meta', p),
   readFileBase64: (p) => ipcRenderer.invoke('read-file-buffer', p),
+  readFileBytes: (p) => ipcRenderer.invoke('read-file-bytes', p),
   // In Electron, dropped File objects expose .path — this helper normalizes them
   getPathForFile: (file) => {
     try {
@@ -28,6 +29,16 @@ contextBridge.exposeInMainWorld('api', {
     let norm = String(p).replace(/\\/g, '/');
     if (!norm.startsWith('/')) norm = '/' + norm;
     // encode each segment to keep spaces/unicode working
+    const encoded = norm.split('/').map(s => encodeURIComponent(s)).join('/');
+    return 'file://' + encoded.replace(/%3A/g, ':');
+  },
+  // Covers are files on this machine, so the app points straight at them. The
+  // browser has no file paths, so its shim builds an API URL instead — which is
+  // why covers are asked for by book rather than by path.
+  coverUrl: (book) => {
+    if (!book || !book.coverPath) return '';
+    let norm = String(book.coverPath).replace(/\\/g, '/');
+    if (!norm.startsWith('/')) norm = '/' + norm;
     const encoded = norm.split('/').map(s => encodeURIComponent(s)).join('/');
     return 'file://' + encoded.replace(/%3A/g, ':');
   }
