@@ -12,6 +12,8 @@
     "tunnel": "node server/tunnel.js",
     "funnel": "node server/funnel.js",
     "check": "node harness/check-phone.js",
+    "check:outside": "node harness/check-from-outside.js",
+    "check:books": "electron harness/check-all-books.js",
     "tunnel:fix": "node server/fixed-url.js",
     "build:web": "node web/build.js",
     "deploy": "node web/build.js && vercel deploy --prod",
