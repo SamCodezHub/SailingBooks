@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#ffffff" />
 <title>Sailing Books</title>
 <link rel="stylesheet" href="styles.css" />
 <script src="../node_modules/jszip/dist/jszip.min.js"></script>
@@ -13,7 +14,72 @@
   <!-- ===== Top bar ===== -->
   <header id="topbar">
     <input id="searchInput" type="search" placeholder="Search books…" autocomplete="off" />
+    <button id="btnSettings" class="topbar-btn" title="Settings" aria-label="Settings">&#9881;&#xfe0e;</button>
   </header>
+
+  <!-- ===== Settings ===== -->
+  <div id="settingsScrim" class="hidden"></div>
+  <aside id="settingsPanel" class="hidden" aria-label="Settings">
+    <div class="set-head">
+      <h2>Settings</h2>
+      <button id="btnSettingsClose" class="icon-btn" title="Close settings">×</button>
+    </div>
+    <div class="set-body">
+      <section class="set-block">
+        <h3 class="set-label">Theme</h3>
+        <div id="themeGrid" class="theme-grid"></div>
+      </section>
+
+      <section class="set-block">
+        <h3 class="set-label">Reading</h3>
+        <div class="set-row">
+          <span>Text size</span>
+          <div class="set-stepper">
+            <button id="setFontDown" class="icon-btn" title="Smaller text">−</button>
+            <span id="setFontSize">18px</span>
+            <button id="setFontUp" class="icon-btn" title="Larger text">+</button>
+          </div>
+        </div>
+        <label class="set-row">
+          <span>Typeface</span>
+          <select id="setFontFamily">
+            <option value="Georgia, 'Times New Roman', serif">Serif (Georgia)</option>
+            <option value="'Segoe UI', system-ui, sans-serif">Sans (system)</option>
+            <option value="'Iowan Old Style', 'Palatino Linotype', Palatino, serif">Old style</option>
+            <option value="'Trebuchet MS', 'Segoe UI', sans-serif">Humanist</option>
+            <option value="ui-monospace, 'Cascadia Mono', Consolas, monospace">Monospace</option>
+          </select>
+        </label>
+        <label class="set-row">
+          <span>Line spacing</span>
+          <select id="setLineHeight">
+            <option value="1.3">Tight</option>
+            <option value="1.5"> snug</option>
+            <option value="1.7">Normal</option>
+            <option value="1.95">Relaxed</option>
+            <option value="2.3">Very relaxed</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="set-block">
+        <h3 class="set-label">Keyboard</h3>
+        <div class="set-keys">
+          <div><kbd>←</kbd><kbd>→</kbd><span>page / chapter</span></div>
+          <div><kbd>Ctrl</kbd><kbd>+</kbd><kbd>−</kbd><span>text size</span></div>
+          <div><kbd>F</kbd><span>full screen</span></div>
+          <div><kbd>C</kbd><span>clean reading</span></div>
+          <div><kbd>Esc</kbd><span>back to library</span></div>
+        </div>
+      </section>
+
+      <section class="set-block">
+        <h3 class="set-label">About</h3>
+        <p class="set-note">Sailing Books keeps everything on this computer. Nothing is uploaded anywhere; the address on your phone just points back here.</p>
+        <button id="setResetTheme" class="btn small ghost">Reset appearance</button>
+      </section>
+    </div>
+  </aside>
 
   <!-- ===== Library view ===== -->
   <main id="libraryView">

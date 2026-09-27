@@ -17,6 +17,11 @@ Minimal white desktop app for EPUB, PDF + audiobook reading.
 - Double-click a book → read / listen view
 - Right-click book / folder / empty space → Rename, Move, Color, Delete
 - White minimalistic UI
+- Settings panel (the gear in the top bar, in the app and on the phone): nine
+  themes that repaint the whole interface - library, reader, menus and all - plus
+  text size, typeface, line spacing, a keyboard reference and a reset. Themes are
+  Light, Paper, Solar, Mono, Midnight, Dusk, Ocean, Forest and Ink; the choice is
+  remembered per device, and the phone's browser chrome follows it.
 
 ## Run (dev)
 ```powershell

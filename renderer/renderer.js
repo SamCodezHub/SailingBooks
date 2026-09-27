@@ -9,7 +9,7 @@ const ALL_EXTS = [...EPUB_EXTS, ...PDF_EXTS, ...AUDIO_EXTS];
 
 const PALETTE = ['#ffd9d9', '#ffe9c7', '#fff3b0', '#d9f2d0', '#d0e8ff', '#e6d9ff', '#f5f5f5'];
 
-let state = { folders: [], books: [], settings: { fontSize: 18, fontFamily: "Georgia, 'Times New Roman', serif", lineHeight: '1.7' }, currentFolderId: null, search: '' };
+let state = { folders: [], books: [], settings: { fontSize: 18, fontFamily: "Georgia, 'Times New Roman', serif", lineHeight: '1.7', theme: 'light' }, currentFolderId: null, search: '' };
 let currentBookId = null;
 let epubObjectUrls = [];
 let modalCb = null;
@@ -47,10 +47,24 @@ function publishIndex() {
     } catch {}
   }, 2500);
 }
+const SETTINGS_KEY = 'sailing-books-settings';
 function save() {
-  if (WEB) { saveRemoteProgress(); return; }
+  if (WEB) { saveDeviceSettings(); saveRemoteProgress(); return; }
   publishIndex();
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* quota — strip covers */ try { const slim = { ...state, books: state.books.map(b => ({ ...b, cover: '' })) }; localStorage.setItem(STORE_KEY, JSON.stringify(slim)); } catch {} }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* quota - strip covers */ try { const slim = { ...state, books: state.books.map(b => ({ ...b, cover: '' })) }; localStorage.setItem(STORE_KEY, JSON.stringify(slim)); } catch {} }
+}
+// Settings belong to the device you are sitting at, not to the laptop, so they
+// are kept locally even on the phone - where the library itself is not. Without
+// this, choosing a theme on the phone was undone by the next reload.
+function saveDeviceSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings)); } catch {}
+}
+function loadDeviceSettings() {
+  if (!WEB) return;
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
+    if (s && typeof s === 'object') state.settings = { ...state.settings, ...s };
+  } catch {}
 }
 // On the phone the laptop owns the library; we only report where you got to.
 let remoteSaveT = null;
@@ -83,12 +97,13 @@ async function hydrateFromServer() {
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return;
+    if (!raw) { loadDeviceSettings(); return; }
     const s = JSON.parse(raw);
     if (Array.isArray(s.folders)) state.folders = s.folders;
     if (Array.isArray(s.books)) state.books = s.books;
     if (s.settings) state.settings = { ...state.settings, ...s.settings };
   } catch {}
+  loadDeviceSettings();
 }
 
 /* ---------- helpers ---------- */
@@ -2065,7 +2080,82 @@ async function refreshMissingChapters(limit = 15) {
 }
 
 /* ---------- reader ---------- */
+/* ---------- themes & settings ---------- */
+/* Each theme is three colours the picker previews, and a matching data-theme
+   name that the stylesheet turns into the full palette. The names and swatches
+   live here so the picker and the CSS cannot drift apart. */
+const THEMES = [
+  { id: 'light', name: 'Light', sw: ['#ffffff', '#f7f7f7', '#1a1a1a'] },
+  { id: 'paper', name: 'Paper', sw: ['#f6efe1', '#efe6d5', '#3b3226'] },
+  { id: 'solar', name: 'Solar', sw: ['#fdf6e3', '#eee8d5', '#268bd2'] },
+  { id: 'mono', name: 'Mono', sw: ['#f2f2f2', '#e9e9e9', '#1c1c1c'] },
+  { id: 'midnight', name: 'Midnight', sw: ['#14161d', '#22242e', '#6d8cff'] },
+  { id: 'dusk', name: 'Dusk', sw: ['#191526', '#262036', '#b388ff'] },
+  { id: 'ocean', name: 'Ocean', sw: ['#07222b', '#0f303c', '#2dd4bf'] },
+  { id: 'forest', name: 'Forest', sw: ['#101a13', '#1b2820', '#86c06a'] },
+  { id: 'ink', name: 'Ink', sw: ['#000000', '#141418', '#ffd166'] }
+];
+const THEME_IDS = THEMES.map(t => t.id);
+
+function applyTheme(name) {
+  const id = THEME_IDS.includes(name) ? name : 'light';
+  state.settings.theme = id;
+  document.documentElement.setAttribute('data-theme', id);
+  // Keep the phone's browser chrome in step with the page, so the address bar
+  // does not stay bright white over a dark theme.
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    const probe = getComputedStyle(document.body);
+    meta.setAttribute('content', probe.getPropertyValue('--bg').trim() || '#ffffff');
+  }
+}
+
+function buildThemeGrid() {
+  const grid = $('#themeGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (const t of THEMES) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'theme-card' + (state.settings.theme === t.id ? ' active' : '');
+    card.title = t.name + ' theme';
+    card.innerHTML =
+      '<span class="theme-swatches">' +
+        t.sw.map(c => `<i style="background:${c}"></i>`).join('') +
+      '</span><span class="theme-name">' + escapeHtml(t.name) + '</span>';
+    card.onclick = () => {
+      applyTheme(t.id);
+      save();
+      buildThemeGrid();
+    };
+    grid.appendChild(card);
+  }
+}
+
+function syncSettingsUI() {
+  buildThemeGrid();
+  const size = $('#setFontSize');
+  if (size) size.textContent = state.settings.fontSize + 'px';
+  const fam = $('#setFontFamily');
+  if (fam) fam.value = state.settings.fontFamily;
+  const lh = $('#setLineHeight');
+  if (lh) lh.value = String(state.settings.lineHeight);
+}
+
+function openSettings() {
+  applyTheme(state.settings.theme);
+  syncSettingsUI();
+  $('#settingsScrim').classList.remove('hidden');
+  $('#settingsPanel').classList.remove('hidden');
+}
+function closeSettings() {
+  $('#settingsScrim').classList.add('hidden');
+  $('#settingsPanel').classList.add('hidden');
+}
+function settingsOpen() { return !$('#settingsPanel').classList.contains('hidden'); }
+
 function applyReaderStyle() {
+  applyTheme(state.settings.theme);
   const c = $('#epubContent');
   c.style.fontSize = state.settings.fontSize + 'px';
   c.style.fontFamily = state.settings.fontFamily;
@@ -2617,8 +2707,21 @@ $('#searchInput').oninput = (e) => { state.search = e.target.value; render(); };
 
 $('#btnFontDec').onclick = () => changeFontSize(-1);
 $('#btnFontInc').onclick = () => changeFontSize(1);
-$('#fontFamilySelect').onchange = (e) => { captureEpubProgress(); state.settings.fontFamily = e.target.value; save(); applyReaderStyle(); };
-$('#lineHeightSelect').onchange = (e) => { captureEpubProgress(); state.settings.lineHeight = e.target.value; save(); applyReaderStyle(); };
+$('#fontFamilySelect').onchange = (e) => { captureEpubProgress(); state.settings.fontFamily = e.target.value; save(); applyReaderStyle(); syncSettingsUI(); };
+$('#lineHeightSelect').onchange = (e) => { captureEpubProgress(); state.settings.lineHeight = e.target.value; save(); applyReaderStyle(); syncSettingsUI(); };
+
+/* Settings panel - the same markup and code in the app and in the browser. */
+$('#btnSettings').onclick = () => { settingsOpen() ? closeSettings() : openSettings(); };
+$('#btnSettingsClose').onclick = closeSettings;
+$('#settingsScrim').onclick = closeSettings;
+$('#setFontDown').onclick = () => { changeFontSize(-1); syncSettingsUI(); };
+$('#setFontUp').onclick = () => { changeFontSize(1); syncSettingsUI(); };
+$('#setFontFamily').onchange = (e) => { captureEpubProgress(); state.settings.fontFamily = e.target.value; save(); applyReaderStyle(); };
+$('#setLineHeight').onchange = (e) => { captureEpubProgress(); state.settings.lineHeight = e.target.value; save(); applyReaderStyle(); };
+$('#setResetTheme').onclick = () => { applyTheme('light'); save(); syncSettingsUI(); toast('Appearance reset'); };
+// Clicking the page behind the panel is not how you dismiss it, but on the
+// phone there is no other way to reach the library without the X.
+$('#settingsPanel').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.tagName === 'BUTTON') e.target.click(); });
 
 $('#btnToc').onclick = () => { $('#tocDrawer').classList.contains('hidden') ? openToc() : closeToc(); };
 $('#btnTocClose').onclick = closeToc;
@@ -2720,7 +2823,8 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') {
     if (document.fullscreenElement) return; // let the browser exit fullscreen first
-    if (!$('#modalOverlay').classList.contains('hidden')) closeModal(null);
+    if (settingsOpen()) closeSettings();
+    else if (!$('#modalOverlay').classList.contains('hidden')) closeModal(null);
     else if (!$('#contextMenu').classList.contains('hidden')) hideMenu();
     else if (pendingLink) { pendingLink = null; refreshLinkHL(); }
     else if (chartSelection.length) { clearSelection(); }
@@ -2761,13 +2865,18 @@ document.addEventListener('keydown', (e) => {
 
 /* ---------- boot ---------- */
 load();
+// Apply the saved theme before the first paint, so a dark theme never flashes
+// white on the way in.
+applyTheme(state.settings.theme);
 function startApp() {
-  if (!state.settings) state.settings = { fontSize: 18, fontFamily: "Georgia, 'Times Roman', serif", lineHeight: '1.7' };
+  if (!state.settings) state.settings = { fontSize: 18, fontFamily: "Georgia, 'Times Roman', serif", lineHeight: '1.7', theme: 'light' };
+  if (!state.settings.theme) state.settings.theme = 'light';
   if (typeof state.settings.pdfZoom !== 'number') state.settings.pdfZoom = 1;
   pdfZoom = state.settings.pdfZoom;
   if (!state.settings.readMode) state.settings.readMode = 'scroll'; // 'scroll' | 'pages' (epub)
   render();
   applyReaderStyle();
+  syncSettingsUI();
   pdfReady().catch(() => {});
   if (WEB) return;   // the laptop owns the library: no migrations, no adoption
   // Covers now live as files: migrate once, then auto-adopt anything new.
