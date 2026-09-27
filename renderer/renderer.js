@@ -2019,8 +2019,11 @@ async function loadAudioChapters(book, force = false) {
 }
 
 // Background sweep: audiobooks in the library that have no chapters on record
-// (imported before chapters were read, or read while the file was still being
-// copied) get one more attempt, a few at a time, after launch.
+// (imported before chapters were read, or read too early) get one more attempt,
+// a few at a time, after launch. Very large files are left alone — reading a
+// multi-GB file's metadata can take minutes, and it happens again when the book
+// is opened anyway.
+const SWEEP_MAX_BYTES = 1200 * 1024 * 1024;
 async function refreshMissingChapters(limit = 15) {
   if (!window.api?.getAudioMeta) return 0;
   const todo = state.books.filter(b => b.type === 'audio' && b.storedPath
@@ -2028,8 +2031,12 @@ async function refreshMissingChapters(limit = 15) {
   let found = 0;
   for (const b of todo) {
     try {
+      if (isFinite(b.fileSize) && b.fileSize > SWEEP_MAX_BYTES) continue;   // read it on open instead
       const meta = await loadAudioChapters(b);
-      if (meta && Array.isArray(meta.chapters) && meta.chapters.length) { found++; render(); }
+      if (meta && Array.isArray(meta.chapters) && meta.chapters.length) {
+        if (isFinite(meta.size)) b.fileSize = meta.size;
+        found++; render();
+      }
     } catch {}
     await new Promise(r => setTimeout(r, 30));
   }
@@ -2346,6 +2353,49 @@ function filteredBooks() {
   return list.sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0) || b.addedAt - a.addedAt);
 }
 
+// Covers that extraction got wrong (or never found) can be replaced by hand.
+// Works on the laptop and on the phone — a cover set on the phone is written
+// back to the laptop and shows up in the desktop app too.
+function pickCoverFor(book) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = () => reject(new Error('Could not read that image'));
+        fr.readAsDataURL(file);
+      });
+      const small = await downscaleCover(dataUrl).catch(() => '');
+      if (await storeBookCover(book, small || dataUrl)) {
+        toast('Cover updated');
+        render();
+      } else {
+        toast('Could not save that cover');
+      }
+    } catch (e) {
+      toast(e.message || 'Could not read that image');
+    }
+  };
+  input.click();
+}
+async function removeCoverFor(book) {
+  if (book.coverPath) { try { await window.api.deleteFile(book.coverPath); } catch {} }
+  if (WEB) { try { await window.api.removeCover(book.id); } catch {} }
+  book.coverPath = null;
+  book.cover = '';
+  save();
+  toast('Cover removed');
+  render();
+}
+
 function folderMenuItems(f) {
   if (WEB) return [{ label: 'Manage in the desktop app', action: desktopOnly }];
   return [
@@ -2367,6 +2417,8 @@ function bookMenuItems(b) {
     ...state.folders.map(f => ({ label: f.name.slice(0, 32), action: () => moveBookTo(b, f.id) })),
     { sep: true },
     { label: 'Rename', action: () => renameBook(b) },
+    { label: b.coverPath ? 'Change cover…' : 'Set cover…', action: () => pickCoverFor(b) },
+    ...(b.coverPath ? [{ label: 'Remove cover', action: () => removeCoverFor(b) }] : []),
     ...(b.type === 'audio' ? [{ label: 'Reload chapters', action: async () => {
         toast('Reading chapters…');
         const meta = await loadAudioChapters(b, true);

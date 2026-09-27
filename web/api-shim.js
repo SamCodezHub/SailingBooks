@@ -64,8 +64,16 @@
     getPathForFile(file) { return (file && file.name) || ''; },
     fileUrl(storedPath) {
       const id = String(storedPath || '');
-      if (id.startsWith('id:')) return this.url('/api/book/' + encodeURIComponent(id.slice(3)) + '/file');
+      if (id.startsWith('id:')) {
+        // <img>, <audio> and pdf.js fetch this URL themselves and cannot send
+        // an auth header, so the token has to ride along in the query string.
+        return this.url('/api/book/' + encodeURIComponent(id.slice(3)) + '/file') + this.auth();
+      }
       return id;
+    },
+    auth() {
+      const tok = localStorage.getItem(LS.token);
+      return tok ? '?token=' + encodeURIComponent(tok) : '';
     },
     async readFileBase64(storedPath) {
       const id = String(storedPath || '');
@@ -82,13 +90,28 @@
     },
     async fileExists(storedPath) { return !!String(storedPath || '').startsWith('id:'); },
     async deleteFile() { return true; },
-    async saveCover() { return null; },
+    // Saving a cover from the phone writes it back to the laptop, so the same
+    // cover shows up in the desktop app.
+    async saveCover(bookId, dataUrl) {
+      if (!dataUrl || !bookId) return null;
+      try {
+        const r = await this.req('/book/' + encodeURIComponent(bookId) + '/cover', { method: 'POST', json: { dataUrl } });
+        const out = await r.json().catch(() => ({}));
+        return out.ok ? 'id:' + bookId : null;
+      } catch { return null; }
+    },
     async getAudioMeta(storedPath) { return this.api('/book/' + encodeURIComponent(String(storedPath).replace(/^id:/, '')) + '/meta'); },
     async saveLibraryIndex() { return false; },
     async saveProgress(id, patch) {
       return this.req('/book/' + encodeURIComponent(id) + '/progress', { method: 'POST', json: patch });
     },
-    async fetchLibrary() { return this.api('/library'); }
+    async fetchLibrary() { return this.api('/library'); },
+    async removeCover(bookId) {
+      try {
+        await fetch(this.url('/api/book/' + encodeURIComponent(bookId) + '/cover') + this.auth(), { method: 'DELETE' });
+        return true;
+      } catch { return false; }
+    }
   };
   window.api = api;
 })();

@@ -165,6 +165,8 @@ ipcMain.handle('get-audio-meta', async (event, storedPath) => {
     if (!storedPath || !fs.existsSync(storedPath)) return null;
     const mm = require('music-metadata');
     const meta = await mm.parseFile(storedPath, { duration: true, includeChapters: true });
+    let size = 0;
+    try { size = fs.statSync(storedPath).size; } catch {}
     const chapters = Array.isArray(meta.format.chapters)
       ? meta.format.chapters
           .filter(c => c && isFinite(c.start))
@@ -179,6 +181,7 @@ ipcMain.handle('get-audio-meta', async (event, storedPath) => {
     return {
       duration: isFinite(meta.format.duration) ? +meta.format.duration : null,
       chapters, cover,
+      size,                      // so callers can skip multi-GB files when sweeping
       title: meta.common.title || null,
       artist: meta.common.artist || null,
     };

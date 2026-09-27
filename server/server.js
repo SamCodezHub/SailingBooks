@@ -116,6 +116,12 @@ function mergeProgress(books) {
   if (!Object.keys(p).length) return books;
   return books.map(b => (p[b.id] ? { ...b, ...p[b.id] } : b));
 }
+// Write the index back after a change made from a client (e.g. a new cover).
+function writeIndex() {
+  const idx = readIndex();
+  try { fs.writeFileSync(INDEX_FILE, JSON.stringify({ version: 1, updatedAt: Date.now(), books: idx.books, folders: idx.folders })); } catch {}
+  indexCache.mtime = 0;   // force a re-read
+}
 // Fallback: no index file yet — scan the library folder.
 function scanLibrary() {
   let files = [];
@@ -376,6 +382,37 @@ const server = http.createServer(async (req, res) => {
       }
       if (hit.book.type !== 'audio') return sendJson(res, 200, { duration: null, chapters: [], cover: null });
       return sendJson(res, 200, await audioMeta(hit.path));
+    }
+    if ((m = /^\/api\/book\/([^/]+)\/cover$/.exec(p)) && req.method === 'POST') {
+      // A cover set on the phone is written into the laptop's covers folder, so
+      // the desktop app shows it too.
+      const id = decodeURIComponent(m[1]);
+      let patch = {};
+      try { patch = JSON.parse(await readBody(req, 12e6)) || {}; } catch {}
+      const dm = /^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/s.exec(patch.dataUrl || '');
+      const book = readIndex().books.find(x => x.id === id);
+      if (!dm || !book) return sendJson(res, 400, { error: 'Unknown book or bad image' });
+      const ext = dm[1].includes('png') ? 'png' : dm[1].includes('gif') ? 'gif' : dm[1].includes('webp') ? 'webp' : 'jpg';
+      const file = path.join(COVERS_DIR, id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) + '.' + ext);
+      try {
+        await fsp.writeFile(file, Buffer.from(dm[2], 'base64'));
+      } catch (e) {
+        return sendJson(res, 500, { error: 'Could not write the cover' });
+      }
+      if (book.coverPath && book.coverPath !== file) { try { fs.unlinkSync(book.coverPath); } catch {} }
+      book.coverPath = file;
+      writeIndex();
+      return sendJson(res, 200, { ok: true, path: file });
+    }
+    if ((m = /^\/api\/book\/([^/]+)\/cover$/.exec(p)) && req.method === 'DELETE') {
+      const id = decodeURIComponent(m[1]);
+      const book = readIndex().books.find(x => x.id === id);
+      if (book && book.coverPath) {
+        try { fs.unlinkSync(book.coverPath); } catch {}
+        book.coverPath = null;
+        writeIndex();
+      }
+      return sendJson(res, 200, { ok: true });
     }
     if ((m = /^\/api\/book\/([^/]+)\/progress$/.exec(p)) && req.method === 'POST') {
       const id = decodeURIComponent(m[1]);
