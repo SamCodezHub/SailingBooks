@@ -215,3 +215,106 @@ ipcMain.handle('list-library-files', async () => {
   }
   return out;
 });
+
+/* ---------- Archives: the same shelf of books the web client sees ----------
+   Same folder (%APPDATA%\Sailing Books\Archives) and the same index.json, so
+   a book uploaded from the phone is here, and vice versa. The server needs no
+   duplicate logic beyond this small file-based bridge. */
+const { pathToFileURL } = require('url');
+const crypto = require('crypto');
+const ARCHIVE_BOOK_EXTS = LIB_EXTS;
+
+function archiveDir() { return path.join(app.getPath('userData'), 'Archives'); }
+function archiveBooksDir() { return path.join(archiveDir(), 'Books'); }
+function archiveCoversDir() { return path.join(archiveDir(), 'Covers'); }
+function readArchiveIndex() {
+  try { const j = JSON.parse(fs.readFileSync(path.join(archiveDir(), 'index.json'), 'utf8')); return { version: 1, items: Array.isArray(j.items) ? j.items : [] }; }
+  catch { return { version: 1, items: [] }; }
+}
+function writeArchiveIndex(db) {
+  for (const d of [archiveDir(), archiveBooksDir(), archiveCoversDir()]) fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(archiveDir(), 'index.json'), JSON.stringify({ ...db, updatedAt: Date.now() }, null, 1));
+}
+function publicArchiveItem(it) {
+  return {
+    id: it.id, title: it.title, author: it.author || '', type: it.type, fileName: it.fileName,
+    size: it.size, addedAt: it.addedAt, duration: it.duration || 0, chapters: (it.chapters || []).length || 0
+  };
+}
+// Copy a book onto the shelf. `src` may be a library file (export) or anywhere
+// on disk (upload); nothing is read into memory, so a 1.5 GB audiobook is fine.
+async function archiveAddFile(src, fileName) {
+  const ext = path.extname(fileName).slice(1).toLowerCase();
+  if (!ARCHIVE_BOOK_EXTS.includes(ext)) throw new Error('That file type is not a book');
+  let size = 0;
+  try { size = fs.statSync(src).size; } catch { throw new Error('Could not read that file'); }
+  if (!size) throw new Error('That file is empty');
+  const dest = path.join(archiveBooksDir(), fileName);
+  if (path.resolve(src) !== path.resolve(dest)) fs.copyFileSync(src, dest);
+  const id = crypto.createHash('sha1').update(fileName + '|' + size).digest('hex').slice(0, 14);
+  let title = fileName.replace(/\.[^.]+$/, ''), author = '', duration = null, chapters = [], coverPath = null;
+  if (ext !== 'epub' && ext !== 'pdf') {
+    try {
+      const mm = require('music-metadata');
+      const m = await mm.parseFile(dest, { duration: true, includeChapters: true });
+      duration = isFinite(m.format.duration) ? +m.format.duration : null;
+      chapters = Array.isArray(m.format.chapters) ? m.format.chapters.filter(c => c && isFinite(c.start))
+        .map(c => ({ title: String(c.title || '').slice(0, 120), start: +c.start, end: isFinite(c.end) ? +c.end : null })) : [];
+      if (m.common.title) title = m.common.title;
+      if (m.common.artist) author = m.common.artist;
+      const pic = m.common.picture && m.common.picture[0];
+      if (pic && pic.data && pic.data.length > 512 && pic.data.length < 8 * 1024 * 1024) {
+        const mime = pic.format && pic.format.includes('/') ? pic.format : 'image/jpeg';
+        const cext = mime.includes('png') ? 'png' : mime.includes('gif') ? 'gif' : 'jpg';
+        coverPath = path.join(archiveCoversDir(), id + '.' + cext);
+        fs.writeFileSync(coverPath, pic.data);
+      }
+    } catch {}
+  }
+  const item = { id, title, author, type: ext === 'epub' ? 'epub' : ext === 'pdf' ? 'pdf' : 'audio',
+    fileName, size, addedAt: Date.now(), stored: fileName, coverPath, duration, chapters };
+  const db = readArchiveIndex();
+  db.items = db.items.filter(x => x.id !== id);
+  db.items.unshift(item);
+  writeArchiveIndex(db);
+  return publicArchiveItem(item);
+}
+function archiveSafeName(n) { return String(n || '').replace(/[\\/:*?"<>|]/g, '_').slice(0, 180) || 'book'; }
+
+ipcMain.handle('archive-list', async () => {
+  const db = readArchiveIndex();
+  return { dir: archiveDir(), user: 'admin', items: db.items.map(publicArchiveItem) };
+});
+ipcMain.handle('archive-upload-path', async (event, srcPath) => {
+  if (!srcPath || !fs.existsSync(srcPath)) throw new Error('Could not read that file');
+  return { ok: true, item: await archiveAddFile(srcPath, archiveSafeName(path.basename(srcPath))) };
+});
+ipcMain.handle('archive-export', async (event, bookId) => {
+  let books = [];
+  try {
+    const idx = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'library-index.json'), 'utf8'));
+    books = Array.isArray(idx.books) ? idx.books : [];
+  } catch {}
+  const p = books.find(b => b && b.id === bookId);
+  if (!p || !p.storedPath || !fs.existsSync(p.storedPath)) throw new Error('That book is not in the library');
+  return { ok: true, item: await archiveAddFile(p.storedPath, archiveSafeName(p.fileName || path.basename(p.storedPath))) };
+});
+ipcMain.handle('archive-delete', async (event, id) => {
+  const db = readArchiveIndex();
+  const it = db.items.find(x => x.id === id);
+  if (it) {
+    try { fs.unlinkSync(path.join(archiveBooksDir(), it.stored)); } catch {}
+    if (it.coverPath) { try { fs.unlinkSync(it.coverPath); } catch {} }
+    db.items = db.items.filter(x => x.id !== id);
+    writeArchiveIndex(db);
+  }
+  return { ok: true };
+});
+// A file:// URL so the same <a download> works in the app as on the web.
+ipcMain.handle('archive-download-url', (event, id) => {
+  const it = readArchiveIndex().items.find(x => x.id === id);
+  if (!it) throw new Error('No such book');
+  const p = path.join(archiveBooksDir(), it.stored);
+  if (!fs.existsSync(p)) throw new Error('The file is missing from the archive');
+  return pathToFileURL(p).href;
+});

@@ -128,11 +128,13 @@
       if (!r.ok) throw new Error(data.error || 'Upload failed');
       return data;
     },
-    async archiveCreateSet(set) { return this.req('/archive/set', { method: 'POST', json: set }).then(r => r.json()); },
-    async archiveInstall(id) { return this.req('/archive/install/' + encodeURIComponent(id), { method: 'POST' }).then(r => r.json()); },
+    // Send a book that is already in the library to the archive. The laptop
+    // copies the file itself, so nothing travels through the browser.
+    async archiveExport(bookId) {
+      return this.req('/archive/export/' + encodeURIComponent(bookId), { method: 'POST' }).then(r => r.json());
+    },
     async archiveDeleteItem(id) { return this.req('/archive/item/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => r.json()); },
-    async archiveDeleteSet(id) { return this.req('/archive/set/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => r.json()); },
-    archiveZipUrl(id) { return this.url('/api/archive/zip/' + encodeURIComponent(id)) + this.auth(); },
+    archiveDownloadUrl(id) { return this.url('/api/archive/download/' + encodeURIComponent(id)) + this.auth(); },
     async removeCover(bookId) {
       try {
         await fetch(this.url('/api/book/' + encodeURIComponent(bookId) + '/cover') + this.auth(), { method: 'DELETE' });
