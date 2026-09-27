@@ -43,17 +43,19 @@ It starts the server and prints a public HTTPS address like
 and sign in with the same password. The books still stream from your laptop —
 the tunnel only forwards the connection.
 
-- **First run downloads Cloudflare's `cloudflared`** (about 55 MB) to
+- First run downloads Cloudflare's `cloudflared`** (about 55 MB) to
   `%LOCALAPPDATA%\Sailing Books\tools\cloudflared.exe` (or
   `~/.sailing-books/tools/` on macOS/Linux). It is a single file, needs no
   installer and no admin rights. Delete it to undo. To install it yourself
   instead: `winget install --id Cloudflare.cloudflared`.
-- If that download is blocked, the script falls back to the SSH client built
-  into Windows/macOS, which needs nothing installed but is best effort — the
-  address can change or fail. For a permanent address, create a named
-  Cloudflare Tunnel.
-- The address is different every time you run it (that's normal for a quick
-  tunnel).
+- If a fixed ngrok domain is saved (see below), the tunnel uses that instead of
+  Cloudflare's, because only ngrok can promise the same address every run.
+- If the cloudflared download is blocked, the script falls back to the SSH
+  client built into Windows/macOS, which needs nothing installed but is best
+  effort — the address can change or fail.
+- Without a fixed domain the address is different every time you run it (that's
+  normal for a quick tunnel). It is also printed to
+  `%APPDATA%\Sailing Books\public-url.txt`, so the last one is never lost.
 - **The laptop must be on, awake, and running this** while the phone reads.
   On Windows, set *Settings → Power → Screen and sleep → When plugged in, sleep
   after: Never* if you read for long periods.
@@ -63,41 +65,47 @@ the tunnel only forwards the connection.
   phone, and the server is only reachable on your private network, never
   publicly at all. Use `npm run server` and the Tailscale IP.
 
-## One address that never changes (and Vercel)
+## One address that never changes
 
 A quick tunnel changes its address every run, which is fine for a quick look
-but useless as a bookmark. Two ways to get one permanent address:
+but useless as a bookmark. Here is the short version, then the detail.
 
-**ngrok (free, easiest).** Create a free account at ngrok.com, copy your
-authtoken, then:
+**The best answer is a free ngrok reserved domain.** It is the only free option
+where the address is genuinely fixed forever, and once it is set you never type
+an address on the phone again:
 
 ```
-set NGROK_AUTHTOKEN=your-token-here
-npm run tunnel
+winget install --id ngrok.ngrok          1. install ngrok
+                                          2. free account at ngrok.com
+setx NGROK_AUTHTOKEN your-token-here      3. save the authtoken (open a new terminal after)
+npm run tunnel:fix books.ngrok-free.app   4. reserve a domain in the dashboard, then save it here
+npm run tunnel                            5. done — same address every time
 ```
 
-`npm run tunnel` uses ngrok automatically when it is installed
-(`winget install --id ngrok.ngrok`) — you get the same `https://xxx.ngrok-free.app`
-address every single time.
+`npm run tunnel:fix` with no arguments prints what is currently set and repeats
+these steps; `npm run tunnel:fix --clear` goes back to a changing address. The
+domain is stored in `tunnel.json` on the laptop only (it is not part of the
+project).
 
-**A named Cloudflare Tunnel (free, needs a domain).** If you own a domain and
-point it at Cloudflare, create a named tunnel and its hostname never changes.
+**Then bookmark the tunnel address on the phone and you are done.** The laptop
+serves the whole app itself, so the page knows it is already talking to the
+right machine and the **Laptop address** box does not even appear — you only
+ever type your password.
+
+Two other ways to a permanent address:
+
+**A named Cloudflare Tunnel (free, needs a domain you own).** Point the domain
+at Cloudflare, create a named tunnel, and its hostname never changes.
 
 **Vercel.** The client is plain static files, so the front end can live on
-Vercel and point at the laptop. Build the bundle with:
+Vercel and point at the laptop. Build the bundle with `node web/build.js` and
+deploy it. That gives one Vercel address to bookmark, but it is a *different*
+address from the tunnel, and because Vercel is not the laptop it cannot tell
+where the laptop is — so the sign-in screen does show the **Laptop address**
+box, filled from the last five addresses you used, so you tap instead of type.
 
-```
-node web/build.js
-```
-
-which writes `web/dist/` (index.html with the sign-in gate inlined, the api
-shim, the reader and styles). Deploy it at vercel.com/new by dragging that
-folder in, or `npx vercel deploy`.
-
-That gives you **one Vercel address** to bookmark. The tunnel address is typed
-once into the **Laptop address** box on the sign-in screen and remembered on
-the device, so the two are separate: Vercel is the front door, the tunnel is
-the way through to the laptop.
+You only need Vercel if you want a front door that does not change when the
+laptop's tunnel does.
 
 ## Reading on the phone
 
@@ -140,7 +148,9 @@ it at your laptop. Two things to know:
    laptop (Cloudflare Tunnel or ngrok), or host the client from the laptop
    server itself (the default, `npm run server`, which already serves it).
 2. The login screen has a **Laptop address** box. Fill in the laptop (or tunnel)
-   address once and it is remembered on the phone.
+   address once and it is remembered on the phone, along with the last five you
+   used, so a new tunnel address is one tap rather than typing. If the page is
+   being served *by the laptop itself*, the box is hidden entirely.
 
 To deploy the shell to Vercel, upload these as the static output:
 

@@ -86,6 +86,11 @@ const root = path.join(__dirname, '..');
   }
   ok(/id="loginPass"/i.test(html) && /id="loginServer"/i.test(html),
     'the sign-in gate (password + laptop address) is inlined into the page the phone opens');
+  ok(/window\.SB_SERVED_BY_LAPTOP=1/.test(html),
+    'the page says it is being served by the laptop, so the phone can skip the address box');
+  const loginJs = await (await fetch(BASE + '/login.js')).text();
+  ok(/SB_SERVED_BY_LAPTOP/.test(loginJs) && /sb-web-recent/.test(loginJs),
+    'the gate hides the address when served by the laptop and offers recent addresses otherwise');
   const shim = await (await fetch(BASE + '/api-shim.js')).text();
   ok(!/archive/i.test(shim), 'the client has no archive code left');
   const rend = await (await fetch(BASE + '/renderer.js')).text();

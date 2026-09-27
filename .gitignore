@@ -29,3 +29,6 @@ web-progress.json
 .vercel/
 
 .vercel
+
+# this laptop's own fixed public address (machine specific)
+tunnel.json

@@ -298,6 +298,10 @@ async function serveClient(res, urlPath) {
         html = html.replace('<div id="app">', gate + '\n<div id="app">');
         html = html.replace(/<script src="renderer\.js"><\/script>/,
           '<script src="/api-shim.js"></script>\n<script src="/login.js"></script>\n<script src="/renderer.js"></script>');
+        // This copy is being served BY the laptop, so the phone is already at the
+        // right address: the sign-in gate can hide the address box entirely and a
+        // bookmarked tunnel link is all you ever need.
+        html = html.replace('<head>', '<head>\n<script>window.SB_SERVED_BY_LAPTOP=1;</script>');
         clientCache.set('index.html', html);
       }
       return send(res, 200, html, { 'content-type': MIME['.html'] });

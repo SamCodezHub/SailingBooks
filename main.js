@@ -20,7 +20,7 @@ function libraryDir() {
   return dir;
 }
 
-// Covers live as files (userData/Covers) â€” never in localStorage (quota!).
+// Covers live as files (userData/Covers) — never in localStorage (quota!).
 function coversDir() {
   const dir = path.join(app.getPath('userData'), 'Covers');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

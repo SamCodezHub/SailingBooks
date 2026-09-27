@@ -23,14 +23,14 @@ body {
 }
 #app { height: 100vh; display: flex; flex-direction: column; }
 
-/* Top bar â€” one search field, nothing else. */
+/* Top bar — one search field, nothing else. */
 #topbar {
   display: flex; align-items: center; justify-content: center;
   padding: 10px 22px;
   background: #fff;
   user-select: none;
 }
-/* The field itself is invisible at rest â€” it reads as part of the page â€” and
+/* The field itself is invisible at rest — it reads as part of the page — and
    only draws itself in when you point at it or start typing. */
 #searchInput {
   width: min(460px, 60vw);
@@ -184,7 +184,7 @@ body {
 #readerControls .font-group { display: flex; align-items: center; gap: 7px; }
 
 /* Phone: the reader bar has more controls than fits, so the title keeps the
-   top row and the controls scroll sideways underneath it â€” otherwise Clean and
+   top row and the controls scroll sideways underneath it — otherwise Clean and
    Full end up off-screen where they cannot be tapped. */
 @media (max-width: 620px) {
   #readerBar { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
@@ -318,7 +318,7 @@ body {
   border-radius: 999px; pointer-events: none; opacity: 0; transition: opacity .25s ease;
 }
 .immersive-hint.show { opacity: 1; }
-/* Reader fullscreen â€” position must be restated: #readerView is position:relative
+/* Reader fullscreen — position must be restated: #readerView is position:relative
    in normal flow, and an author rule beats the UA's :fullscreen position:fixed,
    which left the top of the screen showing the library behind it. */
 #readerView:fullscreen {

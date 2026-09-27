@@ -23,6 +23,7 @@ const https = require('https');
 
 const PORT = +(process.env.SB_PORT || 8787);
 const server = path.join(__dirname, 'server.js');
+const REPO = path.join(__dirname, '..');
 const IS_WIN = process.platform === 'win32';
 const BIN = IS_WIN ? 'cloudflared.exe' : 'cloudflared';
 const DL = {
@@ -30,6 +31,42 @@ const DL = {
   'darwin': 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz',
   'linux': 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64'
 };
+
+function have(cmd) {
+  const r = spawnSync(IS_WIN ? 'where' : 'which', [cmd], { stdio: 'ignore' });
+  return r.status === 0;
+}
+function userData() {
+  if (IS_WIN) return process.env.APPDATA;
+  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support');
+  return process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share');
+}
+// Where the current public address is remembered, so it can be printed again
+// later and offered to the phone without being retyped.
+function urlFile() { return path.join(userData(), 'Sailing Books', 'public-url.txt'); }
+function rememberUrl(url) {
+  try {
+    fs.mkdirSync(path.dirname(urlFile()), { recursive: true });
+    fs.writeFileSync(urlFile(), url + '\n');
+  } catch {}
+}
+function lastUrl() {
+  try { return fs.readFileSync(urlFile(), 'utf8').trim() || null; } catch { return null; }
+}
+
+// A reserved ngrok domain is the one free way to get an address that never
+// changes. Set it once with `npm run tunnel:fix <domain>`; it lands in
+// tunnel.json here and in the env var, and both are honoured.
+function fixedDomain() {
+  const fromEnv = (process.env.SB_NGROK_DOMAIN || process.env.NGROK_DOMAIN || '').trim();
+  if (fromEnv) return fromEnv.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(REPO, 'tunnel.json'), 'utf8'));
+    const d = (j && (j.ngrokDomain || j.domain)) || '';
+    if (d) return String(d).replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  } catch {}
+  return '';
+}
 
 function toolsDir() {
   if (IS_WIN) return path.join(process.env.LOCALAPPDATA || os.homedir(), 'Sailing Books', 'tools');
@@ -106,7 +143,8 @@ async function ensureCloudflared() {
   return dest;
 }
 
-function announce(url, how) {
+function announce(url, how, fixed) {
+  rememberUrl(url);
   console.log('  ------------------------------------------------');
   console.log('  Open this on your phone, from any network:');
   console.log('');
@@ -114,7 +152,13 @@ function announce(url, how) {
   console.log('');
   console.log('  Sign in with the password printed above.');
   if (how) console.log('  Relaying through: ' + how);
-  console.log('  Keep this window open. The address changes each run.');
+  if (fixed) {
+    console.log('');
+    console.log('  This address never changes. Bookmark it on your phone and you');
+    console.log('  will never need to type an address again.');
+  } else {
+    console.log('  Keep this window open. The address changes each run.');
+  }
   console.log('  ------------------------------------------------\n');
 }
 const bare = (s) => String(s).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/\r/g, '');
@@ -135,13 +179,13 @@ function findUrl(text, mode) {
   }
   return null;
 }
-function watch(child, how, mode) {
+function watch(child, how, mode, fixed) {
   let seen = '', announced = false;
   const onLine = (line) => {
     seen += line + '\n';
     if (announced) return;
     const url = findUrl(seen, mode);
-    if (url) { announced = true; announce(url, how); }
+    if (url) { announced = true; announce(url, how, fixed); }
   };
   readline.createInterface({ input: child.stdout }).on('line', onLine);
   readline.createInterface({ input: child.stderr }).on('line', onLine);
@@ -156,9 +200,14 @@ function watch(child, how, mode) {
   });
 }
 function instructions() {
+  const prev = lastUrl();
   console.log('\n  Could not open a public address from this machine.\n');
   console.log('  Options:');
   console.log('    • allow the cloudflared download above and try again');
+  if (prev) console.log('    • the address from your last run was: ' + prev);
+  console.log('    • install ngrok and claim a free reserved domain, then run');
+  console.log('      `npm run tunnel:fix my-name.ngrok-free.app` — that address');
+  console.log('      is fixed for good, and never changes again');
   console.log('    • install Tailscale on the laptop and the phone, run `npm run server`,');
   console.log('      and use the Tailscale IP (private, never public)');
   console.log('    • stay on the same Wi-Fi: `npm run server`\n');
@@ -176,23 +225,41 @@ function instructions() {
   process.on('SIGTERM', bye);
 
   await sleep(1200);
+
+  // A reserved ngrok domain is fixed for good, so it is preferred over
+  // Cloudflare's quick tunnels, whose address is different every run.
+  const domain = fixedDomain();
+  if (domain && have('ngrok')) {
+    const args = ['http', String(PORT), '--domain=' + domain, '--log=stdout'];
+    const token = process.env.NGROK_AUTHTOKEN;
+    if (token) args.push('--authtoken', token);
+    console.log('  Opening your fixed address with ngrok: https://' + domain + '\n');
+    watch(spawn('ngrok', args, { stdio: ['ignore', 'pipe', 'pipe'] }), 'ngrok (fixed domain)', 'ngrok', true);
+    return;
+  }
+  if (domain) {
+    console.log('  tunnel.json asks for the fixed address https://' + domain);
+    console.log('  but ngrok is not installed, so falling back to a changing address.');
+    console.log('  Install ngrok and set NGROK_AUTHTOKEN to use it.\n');
+  }
+
   const exe = await ensureCloudflared().catch(e => { console.error('  download failed:', e.message); return null; });
   if (exe) {
     console.log('  Opening a public address with Cloudflare…\n');
     watch(spawn(exe, ['tunnel', '--url', `http://localhost:${PORT}`], { stdio: ['ignore', 'pipe', 'pipe'] }), 'Cloudflare', 'cloudflare');
     return;
   }
-  // ngrok gives the SAME address every run once you have a free account and an
-  // authtoken, which is the only way to have one bookmark that never changes.
+  // ngrok also gives a fixed address with an account and an authtoken, even
+  // without a reserved domain.
   if (have('ngrok')) {
     const token = process.env.NGROK_AUTHTOKEN;
     const args = ['http', String(PORT), '--log=stdout'];
     if (token) args.push('--authtoken', token);
     console.log('  Opening a stable address with ngrok…\n');
-    watch(spawn('ngrok', args, { stdio: ['ignore', 'pipe', 'pipe'] }), 'ngrok', 'ngrok');
+    watch(spawn('ngrok', args, { stdio: ['ignore', 'pipe', 'pipe'] }), 'ngrok', 'ngrok', !!token);
     return;
   }
-  if (spawnSync(IS_WIN ? 'where' : 'which', ['ssh'], { stdio: 'ignore' }).status === 0) {
+  if (have('ssh')) {
     console.log('  Falling back to the built-in SSH client (best effort, address may change)…\n');
     watch(spawn('ssh', [
       '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ServerAliveInterval=30',
