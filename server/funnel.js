@@ -17,6 +17,7 @@
  * Nothing is uploaded: the books still stream from your laptop.
  */
 const { spawn, spawnSync } = require('child_process');
+const net = require('net');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -26,6 +27,13 @@ const SERVER = path.join(__dirname, 'server.js');
 const IS_WIN = process.platform === 'win32';
 
 function have(cmd) { return spawnSync(IS_WIN ? 'where' : 'which', [cmd], { stdio: 'ignore' }).status === 0; }
+function portOpen(port) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host: '127.0.0.1', port }, () => { s.destroy(); resolve(true); });
+    s.on('error', () => resolve(false));
+    s.setTimeout(900, () => { s.destroy(); resolve(false); });
+  });
+}
 function tailscale(args) {
   const r = spawnSync('tailscale', args, { encoding: 'utf8' });
   return { status: r.status, out: String(r.stdout || ''), err: String(r.stderr || '') };
@@ -79,20 +87,28 @@ function notReadyHelp(res) {
     process.exit(1);
   }
 
-  // Start the library server, then hand it a permanent name.
-  const srv = spawn(process.execPath, [SERVER], {
-    stdio: 'inherit',
-    env: Object.assign({}, process.env, { SB_PARENT_PID: String(process.pid) })
-  });
-  srv.on('exit', code => process.exit(code === null ? 1 : code));
+  // Start the library server, then hand it a permanent name. If one is already
+  // listening on the port (a plain `npm run server`, or a tunnel already open)
+  // then use that one rather than failing to bind.
+  const already = await portOpen(PORT);
+  let srv = null;
+  if (already) {
+    console.log('  Using the Sailing Books server already running on port ' + PORT + '.\n');
+  } else {
+    srv = spawn(process.execPath, [SERVER], {
+      stdio: 'inherit',
+      env: Object.assign({}, process.env, { SB_PARENT_PID: String(process.pid) })
+    });
+    srv.on('exit', code => process.exit(code === null ? 1 : code));
+    await new Promise(r => setTimeout(r, 1200));
+  }
   const bye = () => {
     try { spawnSync('tailscale', ['funnel', 'off'], { stdio: 'ignore' }); } catch {}
-    try { srv.kill(); } catch {}
+    try { if (srv) srv.kill(); } catch {}
     process.exit(0);
   };
   process.on('SIGINT', bye);
   process.on('SIGTERM', bye);
-  await new Promise(r => setTimeout(r, 1200));
 
   // The device name is the first half of the address, so make it readable.
   const wantName = (process.env.SB_FUNNEL_NAME || '').trim();
@@ -133,7 +149,8 @@ function notReadyHelp(res) {
   console.log('  Keep this window open while you read.');
   console.log('  ------------------------------------------------\n');
 
-  // Nothing else to supervise: the server is in the foreground, the funnel runs
-  // in Tailscale's own daemon.
-  setInterval(() => { if (srv.exitCode !== null) process.exit(srv.exitCode || 0); }, 5000);
+  // Nothing else to supervise when the server was already running: the funnel
+  // lives in Tailscale's own daemon, so just stay up until Ctrl+C.
+  if (srv) setInterval(() => { if (srv.exitCode !== null) process.exit(srv.exitCode || 0); }, 5000);
+  else setInterval(() => {}, 1 << 30);
 })();
