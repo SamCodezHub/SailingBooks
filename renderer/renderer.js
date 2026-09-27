@@ -2018,20 +2018,23 @@ async function loadAudioChapters(book, force = false) {
   return meta;
 }
 
-// Background sweep: audiobooks in the library that have no chapters on record
-// (imported before chapters were read, or read too early) get one more attempt,
-// a few at a time, after launch. Very large files are left alone — reading a
-// multi-GB file's metadata can take minutes, and it happens again when the book
-// is opened anyway.
-const SWEEP_MAX_BYTES = 1200 * 1024 * 1024;
+// Background sweep: audiobooks with no chapters on record get one more attempt.
+// Skipped for large files on purpose — reading a 1 GB audiobook's metadata can
+// take tens of seconds, and 30 of them would freeze the app at launch. Their
+// chapters are read when the book is opened instead, which is when you want
+// them. The whole sweep is also capped by wall-clock time.
+const SWEEP_MAX_BYTES = 250 * 1024 * 1024;
+const SWEEP_BUDGET_MS = 20000;
 async function refreshMissingChapters(limit = 15) {
   if (!window.api?.getAudioMeta) return 0;
   const todo = state.books.filter(b => b.type === 'audio' && b.storedPath
     && !(Array.isArray(b.chapters) && b.chapters.some(c => c && isFinite(c.start)))).slice(0, limit);
+  const until = Date.now() + SWEEP_BUDGET_MS;
   let found = 0;
   for (const b of todo) {
+    if (Date.now() > until) break;                      // time is up, next launch continues
     try {
-      if (isFinite(b.fileSize) && b.fileSize > SWEEP_MAX_BYTES) continue;   // read it on open instead
+      if (isFinite(b.fileSize) && b.fileSize > SWEEP_MAX_BYTES) { b.fileSize = b.fileSize; continue; }
       const meta = await loadAudioChapters(b);
       if (meta && Array.isArray(meta.chapters) && meta.chapters.length) {
         if (isFinite(meta.size)) b.fileSize = meta.size;
@@ -2103,6 +2106,11 @@ function renderArchives() {
   btn(sel ? `New set (${sel})` : 'New set', 'Group the ticked books into a set', archiveCreateSet, 'primary');
 
   body.innerHTML = '';
+  const note = document.createElement('div');
+  note.className = 'arc-empty';
+  note.innerHTML = 'A separate shelf for sharing — your library books stay where they are. ' +
+    '<b>← Library</b> goes back to them.';
+  body.appendChild(note);
   if (archiveView.error) {
     const e = document.createElement('div');
     e.className = 'arc-error';
