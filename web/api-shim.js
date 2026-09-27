@@ -106,35 +106,6 @@
       return this.req('/book/' + encodeURIComponent(id) + '/progress', { method: 'POST', json: patch });
     },
     async fetchLibrary() { return this.api('/library'); },
-
-    /* ---- Sailing Books Archives (stored on the laptop) ---- */
-    async archiveLogin(username, password) {
-      const r = await fetch(this.url('/api/archive/login'), {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok || !data.token) throw new Error(data.error || 'Wrong username or password');
-      localStorage.setItem(LS.token, data.token);
-      return data;
-    },
-    async archiveList() { return this.api('/archive'); },
-    async archiveUpload(file) {
-      const r = await fetch(this.url('/api/archive/upload?name=' + encodeURIComponent(file.name)), {
-        method: 'POST', headers: Object.assign({ 'content-type': 'application/octet-stream' }, this.headers()),
-        body: file
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || 'Upload failed');
-      return data;
-    },
-    // Send a book that is already in the library to the archive. The laptop
-    // copies the file itself, so nothing travels through the browser.
-    async archiveExport(bookId) {
-      return this.req('/archive/export/' + encodeURIComponent(bookId), { method: 'POST' }).then(r => r.json());
-    },
-    async archiveDeleteItem(id) { return this.req('/archive/item/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => r.json()); },
-    archiveDownloadUrl(id) { return this.url('/api/archive/download/' + encodeURIComponent(id)) + this.auth(); },
     async removeCover(bookId) {
       try {
         await fetch(this.url('/api/book/' + encodeURIComponent(bookId) + '/cover') + this.auth(), { method: 'DELETE' });

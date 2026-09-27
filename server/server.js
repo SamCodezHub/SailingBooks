@@ -116,18 +116,16 @@ function mergeProgress(books) {
   if (!Object.keys(p).length) return books;
   return books.map(b => (p[b.id] ? { ...b, ...p[b.id] } : b));
 }
-// Write the index back. Pass a new state to replace it (e.g. after a client
-// added something); with no argument it just re-saves what is on record.
-function writeIndex(next) {
+// Write the index back after something on disk changed (e.g. a cover).
+function writeIndex() {
   const cur = readIndex();
-  const state = next || { books: cur.books, folders: cur.folders };
   try {
     fs.writeFileSync(INDEX_FILE, JSON.stringify({
       version: 1, updatedAt: Date.now(),
-      books: state.books || [], folders: state.folders || []
+      books: cur.books, folders: cur.folders
     }));
   } catch (e) { console.warn('write index failed', e); }
-  indexCache = { mtime: 0, books: state.books || [], folders: state.folders || [] };
+  indexCache = { mtime: 0, books: cur.books, folders: cur.folders };
 }
 // Fallback: no index file yet — scan the library folder.
 function scanLibrary() {
@@ -352,16 +350,13 @@ const server = http.createServer(async (req, res) => {
 
   // ---- everything else needs the token (but the sign-in pages themselves must
   // be reachable before you have one) ----
-  const needsAuth = p.startsWith('/api/') && p !== '/api/login' && p !== '/api/archive/login';
+  const needsAuth = p.startsWith('/api/') && p !== '/api/login';
   if (needsAuth) {
     const token = req.headers['x-sb-token'] || url.searchParams.get('token') || '';
     if (!verifyToken(token)) return sendJson(res, 401, { error: 'Not signed in' });
   }
 
   try {
-    if (p === '/api/archive' || p.startsWith('/api/archive/')) {
-      return await archive.handle(req, res, url, p);
-    }
     if (p === '/api/session') {
       return sendJson(res, 200, { ok: true, name: 'Laptop library', libraryDir: LIBRARY_DIR });
     }
@@ -468,14 +463,6 @@ if (process.env.SB_PARENT_PID) {
     try { process.kill(parentPid, 0); } catch { console.log('  parent gone — shutting down.'); process.exit(0); }
   }, 4000).unref();
 }
-
-// Archives live on this laptop: %APPDATA%\Sailing Books\Archives
-const archive = require('./archive').create({
-  userDataDir: () => USER_DATA,
-  libraryDir: () => LIBRARY_DIR,
-  password: () => AUTH.password,
-  sign, verifyToken, readBody, send, sendJson, readIndex, writeIndex
-});
 
 server.on('error', (e) => {
   if (e && e.code === 'EADDRINUSE') {

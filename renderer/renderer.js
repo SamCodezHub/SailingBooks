@@ -1,4 +1,4 @@
-/* Sailing Books â€” renderer */
+/* Sailing Books Ã¢â‚¬â€ renderer */
 const $ = (s) => document.querySelector(s);
 
 const STORE_KEY = 'sailing-books-v1';
@@ -31,7 +31,7 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 /* ---------- persistence ---------- */
 const WEB = !!(window.api && window.api.mode === 'web');   // phone / browser client
 // The web client (server/server.js) reads library-index.json instead of
-// localStorage, so mirror the book list there â€” throttled, and never mid-drag.
+// localStorage, so mirror the book list there Ã¢â‚¬â€ throttled, and never mid-drag.
 let indexSaveT = null;
 function publishIndex() {
   if (WEB || indexSaveT) return;
@@ -50,7 +50,7 @@ function publishIndex() {
 function save() {
   if (WEB) { saveRemoteProgress(); return; }
   publishIndex();
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* quota â€” strip covers */ try { const slim = { ...state, books: state.books.map(b => ({ ...b, cover: '' })) }; localStorage.setItem(STORE_KEY, JSON.stringify(slim)); } catch {} }
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* quota Ã¢â‚¬â€ strip covers */ try { const slim = { ...state, books: state.books.map(b => ({ ...b, cover: '' })) }; localStorage.setItem(STORE_KEY, JSON.stringify(slim)); } catch {} }
 }
 // On the phone the laptop owns the library; we only report where you got to.
 let remoteSaveT = null;
@@ -221,7 +221,7 @@ async function createFolder() {
   if (!r || !r.value) return;
   state.folders.push({ id: uid(), name: r.value.slice(0, 60), color: r.color || PALETTE[0], createdAt: Date.now() });
   save(); render();
-  toast(`Folder â€œ${r.value}â€ created`);
+  toast(`Folder Ã¢â‚¬Å“${r.value}Ã¢â‚¬Â created`);
 }
 async function renameFolder(f) {
   const r = await promptName('Rename folder', f.name, true, f.color);
@@ -231,13 +231,13 @@ async function renameFolder(f) {
   save(); render();
 }
 async function recolorFolder(f) {
-  const r = await promptName(`Color â€” ${f.name}`, f.name, true, f.color);
+  const r = await promptName(`Color Ã¢â‚¬â€ ${f.name}`, f.name, true, f.color);
   if (!r) return;
   if (r.color) { f.color = r.color; save(); render(); }
 }
 function deleteFolder(f) {
   const n = booksInFolder(f.id).length;
-  if (!confirm(`Delete folder â€œ${f.name}â€?${n ? `\n${n} book(s) will move to Unsorted.` : ''}`)) return;
+  if (!confirm(`Delete folder Ã¢â‚¬Å“${f.name}Ã¢â‚¬Â?${n ? `\n${n} book(s) will move to Unsorted.` : ''}`)) return;
   state.folders = state.folders.filter(x => x.id !== f.id);
   state.books.forEach(b => { if (b.folderId === f.id) b.folderId = null; });
   if (state.currentFolderId === f.id) state.currentFolderId = null;
@@ -254,15 +254,15 @@ function moveBookTo(book, folderId) {
     if (of && Array.isArray(of.nodes)) of.nodes.forEach(n => { if (n.bookId === book.id) n.bookId = null; });
   }
   save(); render();
-  if (target) toast(`Moved to â€œ${folderById(target)?.name || ''}â€`);
-  else if (wasIn) toast(`Removed from â€œ${folderById(wasIn)?.name || 'folder'}â€ â€” now in Unsorted`);
+  if (target) toast(`Moved to Ã¢â‚¬Å“${folderById(target)?.name || ''}Ã¢â‚¬Â`);
+  else if (wasIn) toast(`Removed from Ã¢â‚¬Å“${folderById(wasIn)?.name || 'folder'}Ã¢â‚¬Â Ã¢â‚¬â€ now in Unsorted`);
   else toast('Already in Unsorted');
 }
 
 /* ---------- reading flowchart (per folder): free nodes + connections ---------- */
 // Each folder may carry `nodes`: [{id, label, fx, fy (0..1 pos), bookId?}]
-// and `edges`: [{from, to}]. Nodes are abstract â€” not books.
-const NODE_W = 150; // fallbacks only â€” real node size is measured (nodeSize)
+// and `edges`: [{from, to}]. Nodes are abstract Ã¢â‚¬â€ not books.
+const NODE_W = 150; // fallbacks only Ã¢â‚¬â€ real node size is measured (nodeSize)
 const NODE_H = 64;
 function clamp01(v) { v = Number(v); if (!isFinite(v)) return 0.1; return Math.min(1, Math.max(0, v)); }
 function folderNodes(fid) { const f = folderById(fid); if (!f) return []; if (!Array.isArray(f.nodes)) f.nodes = []; return f.nodes; }
@@ -324,7 +324,7 @@ function clearChart(fid) {
   const f = folderById(fid);
   if (!f) return;
   if ((!f.nodes || !f.nodes.length) && (!f.edges || !f.edges.length) && (!f.sections || !f.sections.length)) return;
-  if (!confirm(`Clear the flowchart for â€œ${f.name}â€?`)) return;
+  if (!confirm(`Clear the flowchart for Ã¢â‚¬Å“${f.name}Ã¢â‚¬Â?`)) return;
   f.nodes = []; f.edges = []; f.sections = [];
   resetChartUi();
   save(); render();
@@ -382,7 +382,7 @@ function deleteSection(fid, sid) {
   f.sections = f.sections.filter(s => s.id !== sid);
   if (sectionHi && sectionHi.sid === sid) sectionHi = null;
   save(); render();
-  toast('Section removed â€” nodes stay');
+  toast('Section removed Ã¢â‚¬â€ nodes stay');
 }
 async function renameSection(fid, sid) {
   const s = folderSections(fid).find(x => x.id === sid);
@@ -410,7 +410,7 @@ function addSelectionToSection(fid, sid) {
   if (!ids.length) { clearSelection(); return; }
   const s = folderSections(fid).find(x => x.id === sid);
   clearSelection();
-  if (moveNodesToSection(fid, sid, ids) && s) toast(`Added to â€œ${s.name}â€`);
+  if (moveNodesToSection(fid, sid, ids) && s) toast(`Added to Ã¢â‚¬Å“${s.name}Ã¢â‚¬Â`);
 }
 function clearSelection() {
   chartSelection = [];
@@ -437,10 +437,10 @@ function renderSectionBar(fid) {
   for (const s of secs) {
     const chip = document.createElement('span');
     chip.className = 'section-chip';
-    chip.title = 'Click to highlight Â· double-click to rename';
+    chip.title = 'Click to highlight Ã‚Â· double-click to rename';
     chip.innerHTML = `<span class="section-dot" style="background:${escapeHtml(s.color || '#999')}"></span><span>${escapeHtml(s.name)}</span><span class="section-count">${(s.nodeIds || []).length}</span>`;
     const x = document.createElement('button');
-    x.className = 'section-x'; x.textContent = 'Ã—'; x.title = 'Ungroup (keep nodes)';
+    x.className = 'section-x'; x.textContent = 'Ãƒâ€”'; x.title = 'Ungroup (keep nodes)';
     x.onclick = (e) => { e.stopPropagation(); deleteSection(fid, s.id); };
     chip.appendChild(x);
     chip.onclick = () => toggleSectionHi(fid, s.id);
@@ -551,7 +551,7 @@ function chartWheel(e) {
 function handleNodeClick(fid, nodeId) {
   if (pendingLink && pendingLink.fid === fid && pendingLink.id !== nodeId) {
     const ok = addEdge(fid, pendingLink.id, nodeId);
-    toast(ok ? 'Connected âœ“' : 'Already connected');
+    toast(ok ? 'Connected Ã¢Å“â€œ' : 'Already connected');
     pendingLink = null;
     refreshLinkHL();
   } else if (pendingLink && pendingLink.id === nodeId) {
@@ -560,7 +560,7 @@ function handleNodeClick(fid, nodeId) {
   } else {
     pendingLink = { fid, id: nodeId };
     refreshLinkHL();
-    toast('Node selected â€” click another node to connect it');
+    toast('Node selected Ã¢â‚¬â€ click another node to connect it');
   }
 }
 function refreshLinkHL() {
@@ -595,7 +595,7 @@ function makeGhost(text) {
 function beginBookPointer(e, b) {
   if (e.button !== undefined && e.button > 0) return;
   if (WEB) {
-    // No reordering on the phone, but a tap must still open the book â€” this is
+    // No reordering on the phone, but a tap must still open the book Ã¢â‚¬â€ this is
     // the same object the pointer-up handler looks at to decide "it was a tap".
     ptrDrag = { kind: 'book', bookId: b.id, startX: e.clientX, startY: e.clientY, moved: false, ghost: null, pid: e.pointerId, tapOnly: true };
     return;
@@ -733,7 +733,7 @@ function onPointerUp(e) {
         // Re-measure now that it is rendered, so the real node size decides
         // where it lands (its book chip makes it taller than a blank node).
         placeNodeCentered(state.currentFolderId, n, $('#flowChart'), d.dropX, d.dropY);
-        toast('Node added â€” click nodes to connect them');
+        toast('Node added Ã¢â‚¬â€ click nodes to connect them');
       }
     }
   } else if (d.kind === 'node') {
@@ -823,7 +823,7 @@ async function onLassoUp(e) {
   clearSelection();
   if (!r || !r.value) { toast('Selection cleared'); return; }
   const s = createSection(L.fid, r.value, r.color, ids);
-  if (s) toast(`Section â€œ${s.name}â€ created`);
+  if (s) toast(`Section Ã¢â‚¬Å“${s.name}Ã¢â‚¬Â created`);
 }
 function onLassoCancel(e) {
   if (!lasso || e.pointerId !== lasso.pid) return;
@@ -842,10 +842,10 @@ function showSelectionMenu(x, y) {
   if (!ids.length) { clearSelection(); return; }
   const secs = folderSections(fid);
   showMenu(x, y, [
-    { label: `Group ${ids.length} as new sectionâ€¦`, action: async () => {
+    { label: `Group ${ids.length} as new sectionÃ¢â‚¬Â¦`, action: async () => {
         const r = await promptName(`New section (${ids.length})`, '', true, PALETTE[Math.floor(Math.random() * PALETTE.length)]);
         clearSelection();
-        if (r && r.value) { const s = createSection(fid, r.value, r.color, ids); if (s) toast(`Section â€œ${s.name}â€ created`); }
+        if (r && r.value) { const s = createSection(fid, r.value, r.color, ids); if (s) toast(`Section Ã¢â‚¬Å“${s.name}Ã¢â‚¬Â created`); }
       } },
     ...(secs.length ? [{ header: 'Add to section' },
       ...secs.map(s => ({ label: `${s.name} (${(s.nodeIds || []).length})`, action: () => addSelectionToSection(fid, s.id) }))] : []),
@@ -909,10 +909,10 @@ function renderFlowchart() {
     btn.onclick = fn;
     acts.appendChild(btn);
   };
-  mkBtn('âˆ’', 'Zoom out (or scroll over the chart)', () => setChartZoom(fid, chartZoomOf(fid) / 1.2));
+  mkBtn('Ã¢Ë†â€™', 'Zoom out (or scroll over the chart)', () => setChartZoom(fid, chartZoomOf(fid) / 1.2));
   const zl = document.createElement('span');
   zl.id = 'chartZoomLabel';
-  zl.title = 'Zoom â€” click to reset to 100%';
+  zl.title = 'Zoom Ã¢â‚¬â€ click to reset to 100%';
   zl.style.cursor = 'pointer';
   zl.textContent = Math.round(chartZoomOf(fid) * 100) + '%';
   zl.onclick = () => setChartZoom(fid, 1);
@@ -920,7 +920,7 @@ function renderFlowchart() {
   mkBtn('+', 'Zoom in (or scroll over the chart)', () => setChartZoom(fid, chartZoomOf(fid) * 1.2));
   mkBtn('+ Node', 'Add a blank node (or drag a book here to make one)', () => {
     const n = createNode(fid);
-    if (n) toast('Node added â€” drag to arrange, double-click to rename');
+    if (n) toast('Node added Ã¢â‚¬â€ drag to arrange, double-click to rename');
   });
   if (nodes.length || edges.length || folderSections(fid).length) mkBtn('Clear', 'Remove all nodes, connections and sections', () => clearChart(fid));
   renderSectionBar(fid);
@@ -951,7 +951,7 @@ function renderFlowchart() {
     inner.style.height = Math.max(dims.H, host2 ? host2.clientHeight : 0) + 'px';
     const empty = document.createElement('div');
     empty.className = 'flow-empty';
-    empty.innerHTML = `No nodes yet â€” <b>drag a book here</b> to turn it into a node, or start blank.<br/>`;
+    empty.innerHTML = `No nodes yet Ã¢â‚¬â€ <b>drag a book here</b> to turn it into a node, or start blank.<br/>`;
     const btn = document.createElement('button');
     btn.className = 'btn primary small';
     btn.textContent = '+ New node';
@@ -972,12 +972,12 @@ function renderFlowchart() {
       node.style.outline = `2px solid ${sec.color || '#999'}`;
       node.style.outlineOffset = '2px';
     }
-    node.title = sec ? `${n.label} â€” section â€œ${sec.name}â€` : n.label;
-    node.title += linked ? ` â€” linked to â€œ${linked.title}â€` : ' â€” click to select, double-click to rename';
+    node.title = sec ? `${n.label} Ã¢â‚¬â€ section Ã¢â‚¬Å“${sec.name}Ã¢â‚¬Â` : n.label;
+    node.title += linked ? ` Ã¢â‚¬â€ linked to Ã¢â‚¬Å“${linked.title}Ã¢â‚¬Â` : ' Ã¢â‚¬â€ click to select, double-click to rename';
     node.innerHTML = `
       <div class="node-label">${escapeHtml(n.label || 'Untitled')}</div>
-      ${linked ? `<span class="node-book" title="Open â€œ${escapeHtml(linked.title)}â€">Open</span>` : ''}
-      <span class="flow-remove" title="Delete node">Ã—</span>`;
+      ${linked ? `<span class="node-book" title="Open Ã¢â‚¬Å“${escapeHtml(linked.title)}Ã¢â‚¬Â">Open</span>` : ''}
+      <span class="flow-remove" title="Delete node">Ãƒâ€”</span>`;
     node.querySelector('.flow-remove').onclick = (e) => { e.stopPropagation(); deleteNode(fid, n.id); };
     const bb = node.querySelector('.node-book');
     if (bb && linked) bb.onclick = (e) => { e.stopPropagation(); openBook(linked); };
@@ -992,14 +992,14 @@ function renderFlowchart() {
         { label: 'Rename node', action: () => renameNode(fid, n.id) },
         ...(linked ? [{ label: 'Open linked book', action: () => openBook(linked) }] : []),
         { header: 'Link a book' },
-        ...inFolder.slice(0, 30).map(b => ({ label: (b.id === n.bookId ? 'âœ“ ' : '') + b.title.slice(0, 38), action: () => linkNodeBook(fid, n.id, b.id) })),
+        ...inFolder.slice(0, 30).map(b => ({ label: (b.id === n.bookId ? 'Ã¢Å“â€œ ' : '') + b.title.slice(0, 38), action: () => linkNodeBook(fid, n.id, b.id) })),
         ...(n.bookId ? [{ label: 'Unlink book', action: () => linkNodeBook(fid, n.id, null) }] : []),
         { header: 'Section' },
-        ...(sec ? [{ label: `Remove from â€œ${sec.name}â€`, action: () => { sec.nodeIds = (sec.nodeIds || []).filter(id => id !== n.id); save(); render(); } }] : []),
-        ...folderSections(fid).filter(s => !sec || s.id !== sec.id).slice(0, 10).map(s => ({ label: `Put in â€œ${s.name}â€`, action: () => moveNodesToSection(fid, s.id, [n.id]) })),
-        { label: 'New section with this nodeâ€¦', action: async () => {
+        ...(sec ? [{ label: `Remove from Ã¢â‚¬Å“${sec.name}Ã¢â‚¬Â`, action: () => { sec.nodeIds = (sec.nodeIds || []).filter(id => id !== n.id); save(); render(); } }] : []),
+        ...folderSections(fid).filter(s => !sec || s.id !== sec.id).slice(0, 10).map(s => ({ label: `Put in Ã¢â‚¬Å“${s.name}Ã¢â‚¬Â`, action: () => moveNodesToSection(fid, s.id, [n.id]) })),
+        { label: 'New section with this nodeÃ¢â‚¬Â¦', action: async () => {
             const r = await promptName('New section', '', true, PALETTE[Math.floor(Math.random() * PALETTE.length)]);
-            if (r && r.value) { const s = createSection(fid, r.value, r.color, [n.id]); if (s) toast(`Section â€œ${s.name}â€ created`); }
+            if (r && r.value) { const s = createSection(fid, r.value, r.color, [n.id]); if (s) toast(`Section Ã¢â‚¬Å“${s.name}Ã¢â‚¬Â created`); }
           } },
         { sep: true },
         { label: 'Delete node', danger: true, action: () => deleteNode(fid, n.id) },
@@ -1007,7 +1007,7 @@ function renderFlowchart() {
     };
     node.onpointerdown = (e) => {
       if (e.target.closest('.flow-remove') || e.target.closest('.node-book')) return;
-      // A right-drag may start on a node â€” that is the natural way to marquee.
+      // A right-drag may start on a node Ã¢â‚¬â€ that is the natural way to marquee.
       if (e.button === 2) { beginLasso(e, fid); return; }
       beginNodePointer(e, fid, n.id, node);
     };
@@ -1105,7 +1105,7 @@ async function renameBook(b) {
 }
 async function deleteBook(b) {
   if (desktopOnly()) return ;
-  if (!confirm(`Remove â€œ${b.title}â€ from your library?\nThe file will also be deleted from the app library.`)) return;
+  if (!confirm(`Remove Ã¢â‚¬Å“${b.title}Ã¢â‚¬Â from your library?\nThe file will also be deleted from the app library.`)) return;
   try { if (b.storedPath && window.api) await window.api.deleteFile(b.storedPath); } catch {}
   try { if (b.coverPath && window.api) await window.api.deleteFile(b.coverPath); } catch {}
   state.books = state.books.filter(x => x.id !== b.id);
@@ -1119,8 +1119,8 @@ async function importPaths(paths, targetFolderId = null) {
   if (!paths || !paths.length) return;
   const supported = paths.filter(p => typeOf(p));
   const skipped = paths.length - supported.length;
-  if (!supported.length) { toast('No supported files (EPUB, MP3, M4Aâ€¦)'); return; }
-  toast(`Importing ${supported.length} file(s)â€¦`);
+  if (!supported.length) { toast('No supported files (EPUB, MP3, M4AÃ¢â‚¬Â¦)'); return; }
+  toast(`Importing ${supported.length} file(s)Ã¢â‚¬Â¦`);
   let results = [];
   try { results = await window.api.importFiles(supported); }
   catch (e) { toast('Import failed: ' + e.message); return; }
@@ -1140,7 +1140,7 @@ async function importPaths(paths, targetFolderId = null) {
     added++;
   }
   save(); render();
-  toast(added + ' book(s) added' + (skipped ? ` Â· ${skipped} skipped` : ''));
+  toast(added + ' book(s) added' + (skipped ? ` Ã‚Â· ${skipped} skipped` : ''));
   // refresh covers lazily already done
 }
 
@@ -1190,8 +1190,8 @@ async function readEpubMeta(storedPath) {
   const manifestItems = manifestEl ? findKids(manifestEl, 'item') : [...opf.querySelectorAll('manifest > item')];
   const byId = {};
   manifestItems.forEach(i => { byId[xattr(i, 'id')] = i; });
-  // Cover candidates, best guess first: meta name=cover â†’ manifest
-  // cover-image â†’ id/media match â†’ guide reference â†’ biggest other images.
+  // Cover candidates, best guess first: meta name=cover Ã¢â€ â€™ manifest
+  // cover-image Ã¢â€ â€™ id/media match Ã¢â€ â€™ guide reference Ã¢â€ â€™ biggest other images.
   const declared = [];
   const metas = md ? findKids(md, 'meta') : [];
   const coverMeta = metas.find(m => xattr(m, 'name') === 'cover') || opf.querySelector('meta[name="cover"]');
@@ -1613,7 +1613,7 @@ function pdfBaseWidth() {
 async function openPdfBook(book) {
   closePdfDoc();
   await pdfReady();
-  $('#pdfPages').innerHTML = '<p style="color:#999">Loading PDFâ€¦</p>';
+  $('#pdfPages').innerHTML = '<p style="color:#999">Loading PDFÃ¢â‚¬Â¦</p>';
   const doc = await window.pdfjsLib.getDocument({ url: pdfFileUrl(book.storedPath) }).promise;
   if (currentBookId !== book.id) { try { await doc.destroy(); } catch {} return; }
   pdfDoc = doc;
@@ -1778,7 +1778,7 @@ function closePdfDoc() {
 
 /* ---------- EPUB chapters + pagination + chapter drawer ---------- */
 let epubState = null; // {book, chapters, toc, idx, page, pages}
-let epubJumpPage = null; // 'last' â€” land on the final page of the chapter we just opened
+let epubJumpPage = null; // 'last' Ã¢â‚¬â€ land on the final page of the chapter we just opened
 let audioChapters = []; // [{title, start, end}] for the open audiobook
 let audioChapterIdx = -1;
 
@@ -1964,12 +1964,12 @@ function updateChapterNav() {
   $('#btnViewPages').classList.toggle('active', epubMode() === 'pages');
   if (isEpub && epubState) {
     const n = epubState.chapters.length;
-    $('#chapterLabel').textContent = `${epubState.chapters[epubState.idx]?.label || 'Chapter'} Â· ${epubState.idx + 1}/${n}`;
+    $('#chapterLabel').textContent = `${epubState.chapters[epubState.idx]?.label || 'Chapter'} Ã‚Â· ${epubState.idx + 1}/${n}`;
     $('#pageLabel').textContent = `${(epubState.page || 0) + 1} / ${epubState.pages || 1}`;
   } else if (audioCh) {
     const a = $('#audioEl');
     const idx = audioChapterIndex(a && isFinite(a.currentTime) ? a.currentTime : 0);
-    $('#chapterLabel').textContent = `${audioChapters[idx]?.title || 'Chapter'} Â· ${idx + 1}/${audioChapters.length}`;
+    $('#chapterLabel').textContent = `${audioChapters[idx]?.title || 'Chapter'} Ã‚Â· ${idx + 1}/${audioChapters.length}`;
   }
 }
 
@@ -1997,7 +1997,7 @@ function gotoAudioChapter(i) {
 }
 
 // Read the chapters embedded in an audiobook file. A book that was latched
-// "done" by an older build but never actually got chapters is retried â€” that
+// "done" by an older build but never actually got chapters is retried Ã¢â‚¬â€ that
 // stale flag is exactly why chapters could go missing.
 async function loadAudioChapters(book, force = false) {
   if (!book || book.type !== 'audio' || !window.api?.getAudioMeta) return null;
@@ -2019,7 +2019,7 @@ async function loadAudioChapters(book, force = false) {
 }
 
 // Background sweep: audiobooks with no chapters on record get one more attempt.
-// Skipped for large files on purpose â€” reading a 1 GB audiobook's metadata can
+// Skipped for large files on purpose Ã¢â‚¬â€ reading a 1 GB audiobook's metadata can
 // take tens of seconds, and 30 of them would freeze the app at launch. Their
 // chapters are read when the book is opened instead, which is when you want
 // them. The whole sweep is also capped by wall-clock time.
@@ -2046,170 +2046,6 @@ async function refreshMissingChapters(limit = 15) {
   return found;
 }
 
-/* ---------- Sailing Books Archives: a shelf of books on the laptop ---------- */
-/* A book goes up, a book comes down. No folders, no flowcharts, no sets: you
-   download a book and drag it into the app like any other import. */
-let archiveView = null;   // null = not open, otherwise {items, busy}
-
-function archivesAvailable() { return !!(window.api && window.api.archiveList); }
-
-async function refreshArchive() {
-  const data = await window.api.archiveList().catch(() => null);
-  if (data && archiveView) archiveView.items = data.items || [];
-}
-
-async function openArchives() {
-  if (!archivesAvailable()) { toast('Archives need the laptop server (npm run tunnel)'); return; }
-  $('#libraryView').classList.remove('hidden');
-  $('#archiveView').classList.remove('hidden');
-  $('#shelfSection').style.display = 'none';
-  $('#booksSection').style.display = 'none';
-  $('#orderSection').classList.add('hidden');
-  archiveView = { items: [], busy: false };
-  renderArchives();
-  try { await refreshArchive(); }
-  catch (e) { if (archiveView) archiveView.error = e.message || 'Could not reach the archive'; }
-  renderArchives();
-}
-function closeArchives() {
-  archiveView = null;
-  $('#archiveView').classList.add('hidden');
-  $('#shelfSection').style.display = '';
-  $('#booksSection').style.display = '';
-  if (state.currentFolderId) $('#orderSection').classList.remove('hidden');
-}
-
-function fmtBytes(n) {
-  if (!isFinite(n) || n <= 0) return '';
-  const u = ['B', 'KB', 'MB', 'GB'];
-  let i = 0, v = n;
-  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
-  return (v >= 10 || i === 0 ? Math.round(v) : v.toFixed(1)) + ' ' + u[i];
-}
-function fmtClock(s) {
-  if (!isFinite(s) || s < 0) return '';
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = Math.floor(s % 60);
-  return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`;
-}
-
-function renderArchives() {
-  const body = $('#archiveBody');
-  if (!body || !archiveView) return;
-  const acts = $('#archiveActions');
-  acts.innerHTML = '';
-  const btn = (label, title, fn, cls) => {
-    const b = document.createElement('button');
-    b.className = 'btn small ghost' + (cls ? ' ' + cls : '');
-    b.textContent = label; b.title = title; b.onclick = fn;
-    acts.appendChild(b);
-  };
-  btn('← Library', 'Back to your library', closeArchives);
-  btn('Upload books', 'Send books from this device to the archive', archiveUpload, 'primary');
-
-  body.innerHTML = '';
-  const note = document.createElement('div');
-  note.className = 'arc-empty';
-  note.textContent = archiveView.busy ? 'Working…' :
-    'Books stored on your laptop. Download one and drag it into the app — no folders, no sets.';
-  body.appendChild(note);
-  if (archiveView.error) {
-    const e = document.createElement('div');
-    e.className = 'arc-error';
-    e.textContent = archiveView.error;
-    body.appendChild(e);
-    return;
-  }
-
-  const h2 = document.createElement('h3');
-  h2.className = 'arc-head';
-  h2.textContent = archiveView.items.length ? `Books (${archiveView.items.length})` : 'Books';
-  body.appendChild(h2);
-  if (!archiveView.items.length) {
-    const p = document.createElement('div');
-    p.className = 'arc-empty';
-    p.textContent = 'No books yet. Press “Upload books”, or right-click a book in your library and choose “Send to archive”.';
-    body.appendChild(p);
-    return;
-  }
-  const grid = document.createElement('div');
-  grid.className = 'arc-grid';
-  for (const it of archiveView.items) {
-    const el = document.createElement('div');
-    el.className = 'arc-item';
-    const ch = (it.chapters && it.chapters.length) ? it.chapters.length + ' chapters' : '';
-    el.innerHTML = `
-      <div>
-        <div class="arc-name">${escapeHtml(it.title || it.fileName)}</div>
-        <div class="arc-sub">${escapeHtml([it.type === 'audio' ? 'Audio' : it.type === 'pdf' ? 'PDF' : 'EPUB', ch, fmtClock(it.duration), fmtBytes(it.size)].filter(Boolean).join(' · '))}</div>
-      </div>
-      <div class="arc-btns"></div>`;
-    const box = el.querySelector('.arc-btns');
-    const a = document.createElement('a');
-    a.className = 'btn small primary';
-    a.textContent = 'Download';
-    a.title = 'Save this book to this device, then drag it into the app';
-    a.href = window.api.archiveDownloadUrl(it.id);
-    a.download = it.fileName || (it.title || 'book');
-    box.appendChild(a);
-    const del = document.createElement('button');
-    del.className = 'btn small ghost';
-    del.textContent = 'Delete';
-    del.title = 'Remove this book from the archive (the file goes too)';
-    del.onclick = async () => {
-      if (!confirm(`Delete "${it.title || it.fileName}" from the archive?`)) return;
-      await window.api.archiveDeleteItem(it.id).catch(() => {});
-      archiveView.items = archiveView.items.filter(x => x.id !== it.id);
-      renderArchives();
-    };
-    box.appendChild(del);
-    grid.appendChild(el);
-  }
-  body.appendChild(grid);
-}
-
-function archiveUpload() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.multiple = true;
-  input.accept = '.epub,.pdf,.mp3,.m4a,.m4b,.wav,.ogg,.opus,.flac,.aac';
-  input.style.display = 'none';
-  document.body.appendChild(input);
-  input.onchange = async () => {
-    const files = [...(input.files || [])];
-    input.remove();
-    if (!files.length) return;
-    archiveView.busy = true;
-    toast(files.length === 1 ? 'Sending…' : `Sending ${files.length} books…`);
-    renderArchives();
-    let ok = 0;
-    for (const f of files) {
-      try { await window.api.archiveUpload(f); ok++; }
-      catch (e) { toast(`${f.name}: ${e.message || 'failed'}`); }
-    }
-    archiveView.busy = false;
-    await refreshArchive();
-    toast(ok ? `Sent ${ok} book${ok === 1 ? '' : 's'} to the archive` : 'Upload failed');
-    renderArchives();
-  };
-  input.click();
-}
-
-// Send a book that is already in the library to the archive. The laptop copies
-// the file itself, so even a 1.5 GB audiobook never travels through the browser.
-async function archiveExportBook(b) {
-  if (!archivesAvailable() || !window.api.archiveExport) { toast('Archives need the laptop server (npm run tunnel)'); return; }
-  toast(`Sending "${b.title}" to the archive…`);
-  try {
-    const r = await window.api.archiveExport(b.id);
-    toast(r && r.added === false ? 'Already on the archive' : `"${b.title}" is on the archive`);
-    if (archiveView) { await refreshArchive(); renderArchives(); }
-  } catch (e) { toast('Could not send it: ' + (e.message || e)); }
-}
-
-$('#btnArchives').onclick = () => {
-  if (!$('#archiveView').classList.contains('hidden')) closeArchives();
-  else openArchives();
-};
 /* ---------- reader ---------- */
 function applyReaderStyle() {
   const c = $('#epubContent');
@@ -2217,7 +2053,7 @@ function applyReaderStyle() {
   c.style.fontFamily = state.settings.fontFamily;
   c.style.lineHeight = state.settings.lineHeight;
   $('#fontSizeLabel').textContent = state.settings.fontSize + 'px';
-  $('#fontSizeLabel').title = `Text size (zoom ${Math.round(state.settings.fontSize / 18 * 100)}%) â€” Aâˆ’/A+ or Ctrl + scroll`;
+  $('#fontSizeLabel').title = `Text size (zoom ${Math.round(state.settings.fontSize / 18 * 100)}%) Ã¢â‚¬â€ AÃ¢Ë†â€™/A+ or Ctrl + scroll`;
   $('#fontFamilySelect').value = state.settings.fontFamily;
   $('#lineHeightSelect').value = String(state.settings.lineHeight);
   const inner = $('#pagedInner');
@@ -2239,7 +2075,7 @@ function changeFontSize(delta) {
 
 async function openBook(book) {
   if (!book) return;
-  // Already open (e.g. double-click after single-click opened it) â€” don't reload.
+  // Already open (e.g. double-click after single-click opened it) Ã¢â‚¬â€ don't reload.
   if (currentBookId === book.id && !$('#readerView').classList.contains('hidden')) return;
   closePdfDoc();
   currentBookId = book.id;
@@ -2250,9 +2086,9 @@ async function openBook(book) {
   $('#readerTitle').textContent = book.title;
   const chapCount = book.type === 'audio' && Array.isArray(book.chapters)
     ? book.chapters.filter(c => c && isFinite(c.start)).length : 0;
-  $('#readerMeta').textContent = book.type === 'epub' ? `${book.author || 'EPUB'} Â· ${book.fileName}`
-    : book.type === 'pdf' ? `${book.author ? book.author + ' Â· ' : ''}PDF Â· ${book.fileName}`
-    : `Audiobook${chapCount ? ` Â· ${chapCount} chapter${chapCount === 1 ? '' : 's'}` : ''} Â· ${book.fileName}`;
+  $('#readerMeta').textContent = book.type === 'epub' ? `${book.author || 'EPUB'} Ã‚Â· ${book.fileName}`
+    : book.type === 'pdf' ? `${book.author ? book.author + ' Ã‚Â· ' : ''}PDF Ã‚Â· ${book.fileName}`
+    : `Audiobook${chapCount ? ` Ã‚Â· ${chapCount} chapter${chapCount === 1 ? '' : 's'}` : ''} Ã‚Â· ${book.fileName}`;
   $('#epubFontControls').classList.toggle('hidden', book.type !== 'epub');
   $('#pdfControls').classList.toggle('hidden', book.type !== 'pdf');
   $('#epubScroll').classList.toggle('hidden', book.type !== 'epub');
@@ -2266,7 +2102,7 @@ async function openBook(book) {
   }
 
   if (book.type === 'epub') {
-    $('#epubContent').innerHTML = '<p style="color:#999">Loading bookâ€¦</p>';
+    $('#epubContent').innerHTML = '<p style="color:#999">Loading bookÃ¢â‚¬Â¦</p>';
     $('#pagedInner').innerHTML = '';
     $('#pagedInner').style.transform = 'translateX(0)';
     revokeEpubUrls();
@@ -2452,7 +2288,7 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 /* ---------- "next/previous", rolling over into the next chapter ---------- */
-// Audio: skip 30s forward, but never past the end of the current chapter â€”
+// Audio: skip 30s forward, but never past the end of the current chapter Ã¢â‚¬â€
 // past it means "start the next chapter". Back: 15s, or the previous chapter
 // when we are already at the start of this one.
 function audioStep(dir) {
@@ -2521,7 +2357,7 @@ function filteredBooks() {
 }
 
 // Covers that extraction got wrong (or never found) can be replaced by hand.
-// Works on the laptop and on the phone â€” a cover set on the phone is written
+// Works on the laptop and on the phone Ã¢â‚¬â€ a cover set on the phone is written
 // back to the laptop and shows up in the desktop app too.
 function pickCoverFor(book) {
   const input = document.createElement('input');
@@ -2577,7 +2413,7 @@ function bookMenuItems(b) {
   if (WEB) return [{ label: 'Open', action: () => openBook(b) }, { label: 'Manage in the desktop app', action: desktopOnly }];
   return [
     // The one icon the app keeps: the book you right-clicked.
-    { icon: 'ðŸ“–', label: kindVerb(b.type), action: () => openBook(b) },
+    { icon: 'Ã°Å¸â€œâ€“', label: kindVerb(b.type), action: () => openBook(b) },
     ...(b.folderId ? [{ label: 'Remove from folder', action: () => moveBookTo(b, null) }] : []),
     { header: 'Move to folder' },
     { label: 'Unsorted', action: () => moveBookTo(b, null) },
@@ -2586,9 +2422,8 @@ function bookMenuItems(b) {
     { label: 'Rename', action: () => renameBook(b) },
     { label: b.coverPath ? 'Change coverâ€¦' : 'Set coverâ€¦', action: () => pickCoverFor(b) },
     ...(b.coverPath ? [{ label: 'Remove cover', action: () => removeCoverFor(b) }] : []),
-    ...(archivesAvailable() ? [{ label: 'Send to archive', action: () => archiveExportBook(b) }] : []),
     ...(b.type === 'audio' ? [{ label: 'Reload chapters', action: async () => {
-        toast('Reading chaptersâ€¦');
+        toast('Reading chaptersÃ¢â‚¬Â¦');
         const meta = await loadAudioChapters(b, true);
         const n = (meta && meta.chapters && meta.chapters.length) || 0;
         toast(n ? `${n} chapter${n === 1 ? '' : 's'} found` : 'No chapters in this file');
@@ -2619,7 +2454,7 @@ function folderTile(f) {
   };
   return el;
 }
-// Book tile: compact, folder-like â€” one book per tile, draggable.
+// Book tile: compact, folder-like Ã¢â‚¬â€ one book per tile, draggable.
 function bookTile(b) {
   const el = document.createElement('div');
   el.className = 'book-tile';
@@ -2629,7 +2464,7 @@ function bookTile(b) {
     ${cov ? `<img class="shelf-thumb" src="${cov}" alt="" onerror="this.remove()"/>` : `<div class="shelf-thumb"></div>`}
     <div class="shelf-meta">
       <div class="shelf-title">${escapeHtml(b.title)}</div>
-      <div class="shelf-sub">${escapeHtml([b.author, kindLabel(b.type), chapterCount(b) ? chapterCount(b) + ' chapters' : ''].filter(Boolean).join(' Â· '))}</div>
+      <div class="shelf-sub">${escapeHtml([b.author, kindLabel(b.type), chapterCount(b) ? chapterCount(b) + ' chapters' : ''].filter(Boolean).join(' Ã‚Â· '))}</div>
     </div>`;
   el.onpointerdown = (e) => beginBookPointer(e, b);
   el.oncontextmenu = (e) => {
@@ -2643,8 +2478,8 @@ function render() {
   // breadcrumb
   const bc = $('#breadcrumb');
   const cur = state.currentFolderId ? folderById(state.currentFolderId) : null;
-  if (!cur) bc.innerHTML = `<b>Library</b> Â· ${state.books.length} book(s)`;
-  else bc.innerHTML = `<span class="crumb" id="crumbHome" title="Back to library â€” or drop a book here to take it out of this folder">â€¹ Library</span> &nbsp;/&nbsp; <b>${escapeHtml(cur.name)}</b> Â· ${booksInFolder(cur.id).length}`;
+  if (!cur) bc.innerHTML = `<b>Library</b> Ã‚Â· ${state.books.length} book(s)`;
+  else bc.innerHTML = `<span class="crumb" id="crumbHome" title="Back to library Ã¢â‚¬â€ or drop a book here to take it out of this folder">Ã¢â‚¬Â¹ Library</span> &nbsp;/&nbsp; <b>${escapeHtml(cur.name)}</b> Ã‚Â· ${booksInFolder(cur.id).length}`;
   const ch = $('#crumbHome');
   if (ch) {
     ch.onclick = () => { resetChartUi(); state.currentFolderId = null; save(); render(); };
@@ -2658,7 +2493,7 @@ function render() {
     $('#shelfSection').style.display = '';
     $('#booksSection').style.display = 'none';
     const q = state.search.trim().toLowerCase();
-    $('#shelfTitle').textContent = q ? 'Folders & Books Â· results' : 'Folders & Books';
+    $('#shelfTitle').textContent = q ? 'Folders & Books Ã‚Â· results' : 'Folders & Books';
     const shelf = $('#shelfGrid');
     shelf.innerHTML = '';
     $('#emptyState').style.display = (state.books.length === 0 && state.folders.length === 0 && !q) ? '' : 'none';
@@ -2676,11 +2511,11 @@ function render() {
   } else {
     $('#shelfSection').style.display = 'none';
     $('#booksSection').style.display = '';
-    $('#booksTitle').textContent = `Books in â€œ${cur.name}â€`;
+    $('#booksTitle').textContent = `Books in Ã¢â‚¬Å“${cur.name}Ã¢â‚¬Â`;
     const grid = $('#booksGrid');
     grid.innerHTML = '';
     if (!list.length) {
-      grid.innerHTML = `<div style="color:#bbb;font-size:13.5px;padding:18px 4px;">This folder is empty â€” drag books here or right-click â†’ Import.</div>`;
+      grid.innerHTML = `<div style="color:#bbb;font-size:13.5px;padding:18px 4px;">This folder is empty Ã¢â‚¬â€ drag books here or right-click Ã¢â€ â€™ Import.</div>`;
     }
     list.forEach(b => {
     const el = document.createElement('div');
@@ -2695,7 +2530,7 @@ function render() {
       </div>
       <div class="book-meta">
         <div class="book-title">${escapeHtml(b.title)}</div>
-        <div class="book-sub">${escapeHtml(b.author || b.fileName)}${chapterCount(b) ? ` Â· ${chapterCount(b)} chapters` : ''}</div>
+        <div class="book-sub">${escapeHtml(b.author || b.fileName)}${chapterCount(b) ? ` Ã‚Â· ${chapterCount(b)} chapters` : ''}</div>
         ${pct > 2 && pct < 99 ? `<div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>` : ''}
       </div>`;
     el.onpointerdown = (e) => beginBookPointer(e, b);
@@ -2748,7 +2583,7 @@ $('#libraryView').addEventListener('contextmenu', (e) => {
   e.preventDefault();
   showMenu(e.clientX, e.clientY, [
     { label: 'New folder', action: createFolder },
-    { label: 'Import booksâ€¦', action: pickAndImport },
+    { label: 'Import booksÃ¢â‚¬Â¦', action: pickAndImport },
     ...(state.currentFolderId ? [{ label: 'Back to library', action: () => { state.currentFolderId = null; render(); } }] : []),
   ]);
 });
@@ -2757,7 +2592,7 @@ $('#libraryView').addEventListener('contextmenu', (e) => {
 $('#btnEmptyAdd').onclick = pickAndImport;
 $('#btnEmptyFolder').onclick = createFolder;
 // The top bar is just the search field, so Home lives on the breadcrumb
-// ("â€¹ Library") and the reader's "â† Library" button.
+// ("Ã¢â‚¬Â¹ Library") and the reader's "Ã¢â€ Â Library" button.
 $('#btnBack').onclick = closeReader;
 $('#btnFullscreen').onclick = toggleFullscreen;
 $('#searchInput').oninput = (e) => { state.search = e.target.value; render(); };
@@ -2818,7 +2653,7 @@ $('#epubScroll').addEventListener('scroll', () => {
   }, 400);
 }, { passive: true });
 
-// On the phone, keep scrolling at the end of a chapter and it turns the page â€”
+// On the phone, keep scrolling at the end of a chapter and it turns the page Ã¢â‚¬â€
 // same at the top going back. Driven by the gesture, not by reaching the end,
 // so the last line of a chapter is never skipped.
 let edgeBase = null;
@@ -2963,12 +2798,12 @@ async function adoptLibraryFiles() {
         known.add(String(f.storedPath).toLowerCase());
       }
       save(); render();
-      toast(`Added ${added.length} book(s) â€” fetching detailsâ€¦`);
+      toast(`Added ${added.length} book(s) Ã¢â‚¬â€ fetching detailsÃ¢â‚¬Â¦`);
     }
     // Phase 2: enrich with real title/author/cover (+audio chapters) one by
     // one in the background, saving incrementally.
     // Includes previously-tracked books still missing a cover or audio
-    // metadata â€” not just newly added ones.
+    // metadata Ã¢â‚¬â€ not just newly added ones.
     const enrich = [...added];
     for (const b of state.books) {
       if (added.includes(b)) continue;
