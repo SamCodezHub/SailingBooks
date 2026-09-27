@@ -48,8 +48,9 @@ the tunnel only forwards the connection.
   `~/.sailing-books/tools/` on macOS/Linux). It is a single file, needs no
   installer and no admin rights. Delete it to undo. To install it yourself
   instead: `winget install --id Cloudflare.cloudflared`.
-- If a fixed ngrok domain is saved (see below), the tunnel uses that instead of
-  Cloudflare's, because only ngrok can promise the same address every run.
+- If a saved ngrok domain is set (see below), the tunnel uses that instead of
+  Cloudflare's, because only ngrok can promise the same address every run. For a
+  name you choose, use `npm run funnel` (Tailscale Funnel) instead.
 - If the cloudflared download is blocked, the script falls back to the SSH
   client built into Windows/macOS, which needs nothing installed but is best
   effort — the address can change or fail.
@@ -65,47 +66,68 @@ the tunnel only forwards the connection.
   phone, and the server is only reachable on your private network, never
   publicly at all. Use `npm run server` and the Tailscale IP.
 
-## One address that never changes
+## A fixed address with a name in it
 
 A quick tunnel changes its address every run, which is fine for a quick look
-but useless as a bookmark. Here is the short version, then the detail.
+but useless as a bookmark. There are three answers, and only the first one lets
+you pick the name for free.
 
-**The best answer is a free ngrok reserved domain.** It is the only free option
-where the address is genuinely fixed forever, and once it is set you never type
-an address on the phone again:
+**1. Tailscale Funnel — free, and the name is yours (best option).**
 
 ```
-winget install --id ngrok.ngrok          1. install ngrok
-                                          2. free account at ngrok.com
-setx NGROK_AUTHTOKEN your-token-here      3. save the authtoken (open a new terminal after)
-npm run tunnel:fix books.ngrok-free.app   4. reserve a domain in the dashboard, then save it here
-npm run tunnel                            5. done — same address every time
+winget install --id tailscale.tailscale     1. install Tailscale (free)
+                                               2. sign in with Google/GitHub/Microsoft
+tailscale set --hostname=sailing-books       3. name the machine — this is your address
+npm run funnel                               4. done
 ```
 
-`npm run tunnel:fix` with no arguments prints what is currently set and repeats
-these steps; `npm run tunnel:fix --clear` goes back to a changing address. The
-domain is stored in `tunnel.json` on the laptop only (it is not part of the
-project).
+That gives you a permanent, public HTTPS address of the form
+`https://sailing-books.<your-tailnet>.ts.net`. Set the name once and it never
+changes. It costs nothing, needs no domain, and works from mobile data, a hotel
+Wi-Fi, anywhere.
 
-**Then bookmark the tunnel address on the phone and you are done.** The laptop
-serves the whole app itself, so the page knows it is already talking to the
-right machine and the **Laptop address** box does not even appear — you only
-ever type your password.
+**Bookmark it and you are done.** The laptop serves the whole app itself, so the
+page knows it is already talking to the right machine and the **Laptop address**
+box does not even appear — you only ever type your password. Funnel has to be
+approved once (free on every plan, including the free personal one); `npm run
+funnel` prints the link if it is not on yet.
 
-Two other ways to a permanent address:
+Two honest caveats: Funnel traffic goes through Tailscale's relay and has
+bandwidth limits, so streaming a 1 GB audiobook may be slow (reading EPUB text
+is fine), and the laptop must be awake and running this while you read.
 
-**A named Cloudflare Tunnel (free, needs a domain you own).** Point the domain
-at Cloudflare, create a named tunnel, and its hostname never changes.
+**2. ngrok — free, but ngrok picks the name.**
 
-**Vercel.** The client is plain static files, so the front end can live on
-Vercel and point at the laptop. Build the bundle with `node web/build.js` and
-deploy it. That gives one Vercel address to bookmark, but it is a *different*
-address from the tunnel, and because Vercel is not the laptop it cannot tell
-where the laptop is — so the sign-in screen does show the **Laptop address**
-box, filled from the last five addresses you used, so you tap instead of type.
+```
+winget install --id ngrok.ngrok
+setx NGROK_AUTHTOKEN your-token-here
+npm run tunnel
+```
 
-You only need Vercel if you want a front door that does not change when the
-laptop's tunnel does.
+Your free account gets one permanent domain, so the address stops changing. But
+ngrok assigns that name (`abc123xyz.ngrok-free.dev`) and does **not** let you
+choose or reserve one — that needs a paid plan. The free plan also allows 1 GB
+of transfer per month. If you want to pin the exact domain ngrok gave you:
+
+```
+npm run tunnel:fix abc123xyz.ngrok-free.dev
+```
+
+**3. A domain you own — the name you actually want.**
+
+Buy a name such as `books.something.com` (about $10 a year at any registrar),
+point it at Cloudflare, and create a named Cloudflare Tunnel, which is free
+forever. Then the address is `books.yourdomain.com` and nobody else's.
+
+**If you keep using Vercel.** The client is plain static files, so the front end
+can live on Vercel and point at the laptop. Build it with `node web/build.js`.
+That gives one Vercel address to bookmark, but it is a *different* address from
+the tunnel, and because Vercel is not the laptop it cannot know where the laptop
+is — so the sign-in screen does show the **Laptop address** box, filled from the
+last five addresses you used, so you tap instead of type.
+
+You only need Vercel if you want a front door that survives the laptop's own
+address changing.
 
 ## Reading on the phone
 

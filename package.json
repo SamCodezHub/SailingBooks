@@ -10,6 +10,7 @@
     "start": "electron .",
     "server": "node server/server.js",
     "tunnel": "node server/tunnel.js",
+    "funnel": "node server/funnel.js",
     "tunnel:fix": "node server/fixed-url.js",
     "build:web": "node web/build.js",
     "deploy": "node web/build.js && vercel deploy --prod",
