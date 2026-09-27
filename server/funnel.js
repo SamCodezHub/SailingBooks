@@ -21,22 +21,45 @@ const net = require('net');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const readline = require('readline');
 
 const PORT = +(process.env.SB_PORT || 8787);
 const SERVER = path.join(__dirname, 'server.js');
 const IS_WIN = process.platform === 'win32';
 
 function have(cmd) { return spawnSync(IS_WIN ? 'where' : 'which', [cmd], { stdio: 'ignore' }).status === 0; }
+// Tailscale installs into Program Files, which is usually not on PATH, so look
+// where it actually lands before believing it is missing.
+function tailscaleExe() {
+  const names = IS_WIN ? ['tailscale.exe'] : ['tailscale'];
+  const dirs = IS_WIN
+    ? [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], path.join(process.env.LOCALAPPDATA || '', 'Programs')]
+    : ['/usr/local/bin', '/opt/homebrew/bin', '/usr/bin'];
+  for (const d of dirs) {
+    if (!d) continue;
+    for (const n of names) {
+      const p = path.join(d, 'Tailscale', n);
+      try { if (fs.existsSync(p)) return p; } catch {}
+    }
+  }
+  return have('tailscale') ? 'tailscale' : null;
+}
+const TS = tailscaleExe();
+// The funnel command blocks while it waits for browser approval, so it always
+// gets a timeout: this script must never sit there looking frozen.
+function tailscale(args, timeoutMs) {
+  const r = spawnSync(TS || 'tailscale', args, { encoding: 'utf8', timeout: timeoutMs, killSignal: 'SIGKILL' });
+  return {
+    status: r.status, out: String(r.stdout || ''), err: String(r.stderr || ''),
+    timedOut: !!(r.error && (r.error.code === 'ETIMEDOUT' || r.signal === 'SIGKILL'))
+  };
+}
 function portOpen(port) {
   return new Promise((resolve) => {
     const s = net.connect({ host: '127.0.0.1', port }, () => { s.destroy(); resolve(true); });
     s.on('error', () => resolve(false));
     s.setTimeout(900, () => { s.destroy(); resolve(false); });
   });
-}
-function tailscale(args) {
-  const r = spawnSync('tailscale', args, { encoding: 'utf8' });
-  return { status: r.status, out: String(r.stdout || ''), err: String(r.stderr || '') };
 }
 function userData() {
   if (IS_WIN) return process.env.APPDATA;
@@ -75,7 +98,7 @@ function notReadyHelp(res) {
 
 (async () => {
   console.log('\n  Sailing Books — fixed named address\n');
-  if (!have('tailscale')) { installHelp(); process.exit(1); }
+  if (!TS) { installHelp(); process.exit(1); }
 
   const status = tailscale(['status', '--json']);
   if (status.status !== 0) { notReadyHelp(status); process.exit(1); }
@@ -117,17 +140,27 @@ function notReadyHelp(res) {
     if (r.status === 0) console.log('  Named this machine "' + wantName + '".\n');
   }
 
+  // Funnel is a one-time switch in the Tailscale console. The funnel command
+  // prints the exact link for this machine and then blocks waiting, so it is run
+  // with a timeout: the link is read out of what it printed.
   console.log('  Opening your named address…\n');
-  const res = tailscale(['funnel', '--bg', String(PORT)]);
+  const res = tailscale(['funnel', '--bg', String(PORT)], 8000);
   const out = bare(res.out + '\n' + res.err);
   const m = /https:\/\/([a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net)/i.exec(out);
   if (!m) {
-    if (/funnel/i.test(out) && /(enable|approve|login|https:\/\/login|not enabled)/i.test(out)) {
-      notReadyHelp(res);
+    const approval = /https:\/\/login\.tailscale\.com\/[^\s"']+/.exec(out);
+    console.log('  Funnel is not switched on for your account yet. It takes one click,\n');
+    console.log('  once, and it is free on every plan:\n');
+    if (approval) {
+      console.log('    ' + approval[0] + '\n');
+      try { spawnSync(IS_WIN ? 'cmd' : 'open', IS_WIN ? ['/c', 'start', '', approval[0]] : [approval[0]], { stdio: 'ignore' }); } catch {}
+      console.log('  That link is already specific to this machine, and it should have');
+      console.log('  opened in your browser. Turn Funnel on there, then run:\n');
+      console.log('    npm run funnel\n');
+      console.log('  and it will be ready in a couple of seconds.\n');
     } else {
-      console.log('  Could not start the funnel. Tailscale said:\n');
-      console.log(out.split('\n').filter(Boolean).slice(-8).map(l => '    ' + l).join('\n'));
-      console.log('');
+      console.log('    https://login.tailscale.com/admin/dns\n');
+      console.log('  Find "Funnel" on that page and enable it, then run npm run funnel\n');
     }
     process.exit(1);
   }
