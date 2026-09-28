@@ -20,8 +20,10 @@
   --ink: #1a1a1a;
   --strong: #111111;
   --text: #222222;
-  --muted: #8a8a8a;
-  --faint: #b5b5b5;
+  /* Muted and faint text is read at 12-13px, so it has to clear 4.5:1 rather
+     than merely look soft. */
+  --muted: #6f6f6f;
+  --faint: #949494;
   /* lines and marks */
   --line: #ececec;
   --hover: #d4d4d4;
@@ -42,7 +44,7 @@
   --bg: #f6efe1; --panel: #fbf6ec; --panel-2: #f0e7d5; --soft: #efe6d5;
   --chip: rgba(251,246,236,.94); --track: #e3d8c2; --reader-bg: #fbf6ec; --pdf-bg: #e9dfc9;
   --scrim: rgba(246,239,225,.88);
-  --ink: #3b3226; --strong: #2a2318; --text: #3f3629; --muted: #8a7a63; --faint: #b3a68a;
+  --ink: #3b3226; --strong: #2a2318; --text: #3f3629; --muted: #6d6252; --faint: #948872;
   --line: #e0d3ba; --hover: #cdbc9c; --accent: #7a5c3a; --on-accent: #fbf6ec;
   --danger: #a5372a; --focus: #b4762a; --edge: #bfae8f;
   --shadow: 0 1px 2px rgba(90,70,40,.07), 0 8px 22px rgba(90,70,40,.09);
@@ -54,7 +56,7 @@
   --bg: #fdf6e3; --panel: #fdf6e3; --panel-2: #f4ecd8; --soft: #eee8d5;
   --chip: rgba(253,246,227,.94); --track: #e8e0cb; --reader-bg: #fdf6e3; --pdf-bg: #eee8d5;
   --scrim: rgba(253,246,227,.9);
-  --ink: #586e75; --strong: #073642; --text: #586e75; --muted: #93a1a1; --faint: #b5b0a1;
+  --ink: #4d6167; --strong: #073642; --text: #4d6167; --muted: #5f7076; --faint: #8d9499;
   --line: #e3ddc8; --hover: #cbc4ad; --accent: #268bd2; --on-accent: #fdf6e3;
   --danger: #dc322f; --focus: #268bd2; --edge: #b4ae95;
   --shadow: 0 1px 2px rgba(7,54,66,.06), 0 8px 22px rgba(7,54,66,.08);
@@ -126,7 +128,7 @@
   --bg: #f2f2f2; --panel: #ffffff; --panel-2: #ededed; --soft: #e9e9e9;
   --chip: rgba(255,255,255,.94); --track: #dcdcdc; --reader-bg: #f7f7f7; --pdf-bg: #dcdcdc;
   --scrim: rgba(242,242,242,.9);
-  --ink: #1c1c1c; --strong: #000000; --text: #262626; --muted: #777777; --faint: #a8a8a8;
+  --ink: #1c1c1c; --strong: #000000; --text: #262626; --muted: #6a6a6a; --faint: #8e8e8e;
   --line: #dcdcdc; --hover: #c4c4c4; --accent: #1c1c1c; --on-accent: #ffffff;
   --danger: #8a2a20; --focus: #555555; --edge: #b4b4b4;
   --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.07);
@@ -187,6 +189,9 @@ body {
 .btn {
   border: 1px solid var(--line);
   background: var(--panel);
+  /* A <button> does not inherit the page's text colour either: without this it
+     keeps the browser's black, which is unreadable on a dark theme. */
+  color: var(--ink);
   padding: 8px 14px;
   border-radius: 999px;
   font-size: 13.5px;
@@ -198,7 +203,8 @@ body {
 .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .btn.primary:hover { opacity: .88; }
 .icon-btn {
-  border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  border-radius: 8px;
   padding: 5px 10px; cursor: pointer; font-size: 13px;
 }
 .icon-btn:hover { background: var(--soft); }
@@ -210,7 +216,7 @@ body {
 #breadcrumb b { color: var(--ink); font-weight: 650; }
 #breadcrumb .crumb { cursor: pointer; }
 #breadcrumb .crumb:hover { color: var(--ink); text-decoration: underline; }
-#libHint { font-size: 12px; color: var(--faint); }
+#libHint { font-size: 12px; color: var(--muted); }
 .section-title { font-size: 13px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 18px 0 12px; }
 
 #shelfGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
@@ -332,7 +338,21 @@ body {
   #epubContent { padding: 26px 18px 90px; }
 }
 #fontSizeLabel { font-size: 12px; color: var(--muted); min-width: 38px; text-align: center; }
-#readerControls select { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 13px; background: var(--panel); }
+/* A <select> does not take its text colour from the page: the browser paints
+   fieldtext, which stays black on a dark panel and becomes unreadable. Every
+   control has to be given both colours, not just a background. */
+#readerControls select,
+.speed-label select,
+.set-row select,
+#modalInput {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+#readerControls select:focus,
+.speed-label select:focus,
+.set-row select:focus,
+#modalInput:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-soft); }
 
 #epubScroll { flex: 1; overflow-y: auto; background: var(--reader-bg); }
 #epubScroll.hidden { display: none; }

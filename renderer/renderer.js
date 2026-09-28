@@ -2821,6 +2821,13 @@ document.addEventListener('keydown', (e) => {
     if (!$('#readerView').classList.contains('hidden')) { e.preventDefault(); toggleFullscreen(); }
     return;
   }
+  // F for full screen, C for clean reading. Only as bare keys: Ctrl+F is the
+  // browser's find, and a modifier means the user meant something else.
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && !$('#readerView').classList.contains('hidden')) {
+    const typing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable);
+    if (!typing && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); toggleFullscreen(); return; }
+    if (!typing && (e.key === 'c' || e.key === 'C')) { e.preventDefault(); toggleImmersive(); return; }
+  }
   if (e.key === 'Escape') {
     if (document.fullscreenElement) return; // let the browser exit fullscreen first
     if (settingsOpen()) closeSettings();
