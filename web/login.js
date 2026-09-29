@@ -5,6 +5,9 @@
   if (!gate) return;
   const api = window.api;
   if (!api || !api.mode) return;                 // desktop: never show the gate
+  // The hosted Vercel app now uses cloud accounts. The legacy laptop password
+  // gate remains only for pages served directly by server/server.js.
+  if (!window.SB_SERVED_BY_LAPTOP) return;
 
   const form = document.getElementById('loginForm');
   const pass = document.getElementById('loginPass');

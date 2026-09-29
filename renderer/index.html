@@ -13,7 +13,13 @@
 <div id="app">
   <!-- ===== Top bar ===== -->
   <header id="topbar">
+    <div class="topbar-brand"><span class="brand-mark">S</span><span>Sailing Books</span></div>
+    <nav id="libraryNav" class="library-nav hidden" aria-label="Library view">
+      <button id="navLocalLibrary" class="nav-tab active" type="button">Local Library</button>
+      <button id="navOnlineLibrary" class="nav-tab" type="button">Online Library</button>
+    </nav>
     <input id="searchInput" type="search" placeholder="Search books…" autocomplete="off" />
+    <button id="btnAccount" class="account-btn" type="button">Sign in</button>
     <button id="btnSettings" class="topbar-btn" title="Settings" aria-label="Settings">&#9881;&#xfe0e;</button>
   </header>
 
@@ -75,7 +81,7 @@
 
       <section class="set-block">
         <h3 class="set-label">About</h3>
-        <p class="set-note">Sailing Books keeps everything on this computer. Nothing is uploaded anywhere; the address on your phone just points back here.</p>
+        <p class="set-note">Your Local Library stays on this computer. Books move to private online storage only when you add them in Online Library.</p>
         <button id="setResetTheme" class="btn small ghost">Reset appearance</button>
       </section>
     </div>
@@ -121,6 +127,50 @@
       <div id="orderHint">Drag a book here to make a node · drag nodes to arrange (hold one at the edge to auto-scroll) · scroll to zoom, drag empty space to pan · click one node then another to connect · right-drag over nodes to group a named section · double-click renames · right-click for more</div>
       <div id="sectionBar" class="hidden"></div>
       <div id="flowChart"></div>
+    </section>
+  </main>
+
+  <!-- ===== Account, landing page and online library ===== -->
+  <main id="cloudLanding" class="hidden">
+    <section class="landing-copy">
+      <div class="eyebrow">YOUR BOOKS, WITH YOU</div>
+      <h1>A quieter place<br/>for your next chapter.</h1>
+      <p>Keep a private online shelf, read on your own devices, and send books to a computer you trust.</p>
+      <div class="landing-notes"><span>Private by default</span><span>1 GB free library</span><span>Works with your desktop shelf</span></div>
+    </section>
+    <section class="cloud-auth-card" aria-label="Account sign in">
+      <div class="auth-heading"><span class="eyebrow" id="cloudAuthEyebrow">WELCOME BACK</span><h2 id="cloudAuthTitle">Sign in to your library</h2><p id="cloudAuthSub">Your local books stay on this computer.</p></div>
+      <form id="cloudAuthForm">
+        <label class="cloud-field"><span>Email</span><input id="cloudEmail" type="email" autocomplete="email" required placeholder="you@example.com"/></label>
+        <label class="cloud-field"><span>Password</span><input id="cloudPassword" type="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters"/></label>
+        <div id="cloudAuthError" class="cloud-message" role="status"></div>
+        <button id="cloudAuthSubmit" class="btn primary cloud-submit" type="submit">Sign in</button>
+      </form>
+      <button id="cloudAuthToggle" class="auth-toggle" type="button">New here? Create an account</button>
+    </section>
+  </main>
+
+  <main id="onlineLibraryView" class="hidden">
+    <section class="online-heading">
+      <div><div class="eyebrow">YOUR PRIVATE SHELF</div><h1>Online Library</h1><p>Keep your books available wherever you sign in.</p></div>
+      <div class="online-account"><span id="cloudIdentity"></span><button id="cloudSignOut" class="btn small ghost" type="button">Sign out</button></div>
+    </section>
+    <section class="quota-card">
+      <div class="quota-copy"><strong id="quotaLabel">Storage</strong><span id="quotaText">Sign in to view storage</span></div>
+      <div class="quota-track"><span id="quotaBar"></span></div>
+    </section>
+    <section class="online-upload">
+      <div><h2>Add books to your online library</h2><p>EPUB, PDF, and audiobooks. Uploads count toward your account storage.</p></div>
+      <label class="btn primary upload-button" for="cloudFileInput">Choose books<input id="cloudFileInput" type="file" multiple accept=".epub,.pdf,.mp3,.m4a,.m4b,.wav,.ogg,.opus,.flac,.aac"/></label>
+    </section>
+    <div id="cloudUploadStatus" class="cloud-message" role="status"></div>
+    <section class="online-books-section"><div class="section-line"><h2>Your books</h2><button id="cloudRefresh" class="btn small ghost" type="button">Refresh</button></div><div id="onlineBooks" class="online-books"><div class="online-empty">Sign in to see your online books.</div></div></section>
+    <section class="servers-section">
+      <div class="section-line"><div><div class="eyebrow">CONNECTED COMPUTERS</div><h2>Server library</h2></div><div class="server-head-actions"><select id="targetServerSelect" aria-label="Choose a server"><option value="">Choose a server</option></select><button id="cloudServerRefresh" class="btn small ghost" type="button">Refresh</button></div></div>
+      <p class="section-copy">Connect a computer running Sailing Books to create local copies of books from your online shelf.</p>
+      <form id="serverRegisterForm" class="server-register"><input id="serverName" required maxlength="80" placeholder="Computer name" aria-label="Computer name"/><input id="serverUrl" type="url" required placeholder="https://your-server.example" aria-label="Server address"/><button class="btn" type="submit">Add server</button></form>
+      <div id="serverPairing" class="server-pairing hidden"></div>
+      <div id="serverList" class="server-list"><div class="online-empty">No servers connected yet.</div></div>
     </section>
   </main>
 
@@ -250,5 +300,6 @@
   <div id="toast" class="hidden"></div>
 </div>
 <script src="renderer.js"></script>
+<script src="cloud-client.js"></script>
 </body>
 </html>

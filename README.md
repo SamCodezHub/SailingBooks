@@ -1,6 +1,6 @@
 # Sailing Books ⛵
 
-Minimal white desktop app for EPUB, PDF + audiobook reading.
+Local-first library and reader for EPUBs, PDFs and audiobooks, with a matching browser companion.
 
 ## Features
 - Drag & drop `.epub`, `.pdf`, `.mp3`, `.m4a`, `.m4b`, `.wav`, `.ogg`, `.opus`, `.flac`, `.aac`
@@ -16,12 +16,14 @@ Minimal white desktop app for EPUB, PDF + audiobook reading.
 - Folders: rename, color-code, delete (books move to Unsorted)
 - Double-click a book → read / listen view
 - Right-click book / folder / empty space → Rename, Move, Color, Delete
-- White minimalistic UI
+- Shared desktop and web interface with a modern library and reader, responsive motion, and nine complete visual identities: Light, Paper, Solar, Mono, Midnight, Dusk, Ocean, Forest and Ink. Themes use their own type, borders, shadows and textures and are remembered per device.
 - Settings panel (the gear in the top bar, in the app and on the phone): nine
   themes that repaint the whole interface - library, reader, menus and all - plus
   text size, typeface, line spacing, a keyboard reference and a reset. Themes are
   Light, Paper, Solar, Mono, Midnight, Dusk, Ocean, Forest and Ink; the choice is
   remembered per device, and the phone's browser chrome follows it.
+- Separate Local Library and Online Library views, with Supabase email/password accounts, private book uploads and downloads, a 1 GiB standard storage quota, and an Admin account limit controlled by server configuration.
+- Desktop pairing for local-copy servers: select an active computer and queue online books into that computer's local library. Server jobs are downloaded directly from private storage by the paired server agent.
 
 ## Run (dev)
 ```powershell
@@ -30,15 +32,23 @@ npm install
 npm start
 ```
 
-## Build the .exe
+## Build the v1.0.1 .exe
 ```powershell
 cd sailing-books
 npm install
-npm run dist
+npm run dist -- --config.directories.output=release/1.0.1
 ```
-Output: `sailing-books\dist\Sailing-Books-Setup-1.0.0.exe`
-Install it, launch **Sailing Books** from Start Menu / Desktop shortcut.
+Output: `sailing-books\release\1.0.1\Sailing-Books-Setup-1.0.1.exe`. The 1.0.0 installer remains in `dist`.
+Install it, then launch **Sailing Books** from the Start Menu or desktop shortcut.
 Your library files are copied to `%APPDATA%\Sailing Books\Library`.
+
+## Build the web app
+```powershell
+npm run build:web
+```
+The static site is written to `web\dist`. It uses the same renderer and styles as the desktop app. The Vercel project also serves its cloud-account API from the root `api` folder.
+
+Before enabling sign-up, uploads, or server pairing, follow [`supabase/README.md`](supabase/README.md) to run the database migration and configure Vercel. The service-role key and Admin email are server-only settings.
 
 ## Notes
 - EPUB parsing is fully offline (JSZip, no server).

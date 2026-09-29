@@ -1,6 +1,6 @@
-/* Build the static client for hosting somewhere else (Vercel, Netlify, any
- * static host). The desktop app and `npm run server` do not need this — the
- * server serves the same files itself.
+/* Build the static client portion of the Vercel project. Deploy from the repo
+ * root so Vercel includes both web/dist and the root api/ serverless functions.
+ * The desktop app and `npm run server` serve the shared renderer directly.
  *
  *   node web/build.js        ->  web/dist/
  *
@@ -31,6 +31,7 @@ fs.writeFileSync(path.join(OUT, 'styles.css'), read(path.join(ROOT, 'renderer', 
 fs.writeFileSync(path.join(OUT, 'renderer.js'), read(path.join(ROOT, 'renderer', 'renderer.js')));
 fs.writeFileSync(path.join(OUT, 'api-shim.js'), read(path.join(__dirname, 'api-shim.js')));
 fs.writeFileSync(path.join(OUT, 'login.js'), read(path.join(__dirname, 'login.js')));
+fs.writeFileSync(path.join(OUT, 'cloud-client.js'), read(path.join(ROOT, 'renderer', 'cloud-client.js')));
 fs.writeFileSync(path.join(OUT, 'vercel.json'), JSON.stringify({ cleanUrls: true }, null, 2));
 
 // index.html and the PDF worker reach for ../node_modules/... — on a static
@@ -60,5 +61,5 @@ if (missing) process.exitCode = 1;
 console.log('Static client written to ' + OUT);
 console.log('Files:');
 for (const f of fs.readdirSync(OUT)) console.log('  ' + f);
-console.log('\nDeploy: drag web/dist onto https://vercel.com/new (or `npx vercel deploy`),');
-console.log('then open the site and type your tunnel address into "Laptop address".');
+console.log('\nDeploy the repository root with `npm run deploy` so the /api/cloud functions are included.');
+console.log('Run the Supabase migration and add the Vercel environment settings first.');

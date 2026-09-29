@@ -2,6 +2,11 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   getLibraryDir: () => ipcRenderer.invoke('get-library-dir'),
+  saveCloudBook: (fileName, bytes) => ipcRenderer.invoke('save-cloud-book', { fileName, bytes }),
+  getCloudSession: () => ipcRenderer.invoke('get-cloud-session'),
+  saveCloudSession: (value) => ipcRenderer.invoke('save-cloud-session', value),
+  configureCloudAgent: (config) => ipcRenderer.invoke('configure-cloud-agent', config),
+  onCloudInstanceAdded: (callback) => ipcRenderer.on('cloud-instance-added', (_event, book) => callback(book)),
   // Mirror of the library for the web/phone client served by server/server.js
   saveLibraryIndex: (index) => ipcRenderer.invoke('save-library-index', index),
   // Lets the app read the mirrored index back (e.g. after files are changed

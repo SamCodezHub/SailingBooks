@@ -1,6 +1,45 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+let cloudAgentStarted = false;
+let cloudServerRuntime = null;
+let mainWindow = null;
+
+function agentFile() { return path.join(app.getPath('userData'), 'cloud-server-agent.json'); }
+function cloudSessionFile() { return path.join(app.getPath('userData'), 'cloud-session.bin'); }
+function startCloudServerAgent(config) {
+  if (!config || !config.id || !config.token) return false;
+  if (cloudServerRuntime && cloudServerRuntime.startAgent) {
+    cloudServerRuntime.startAgent(config);
+    cloudAgentStarted = true;
+    return true;
+  }
+  process.env.SB_USER_DATA = app.getPath('userData');
+  process.env.SB_CLOUD_SERVER_ID = config.id;
+  process.env.SB_CLOUD_SERVER_TOKEN = config.token;
+  process.env.SB_CLOUD_API_URL = 'https://sailingbooks.vercel.app/api/cloud';
+  process.env.SB_DESKTOP_EMBEDDED = '1';
+  process.env.SB_PORT = process.env.SB_PORT || '8787';
+  try {
+    // Run the library service in the app's main process. It shares the exact
+    // same library folder and remains alive only while the desktop app is open.
+    cloudServerRuntime = require('./server/server.js');
+    cloudAgentStarted = true;
+    return true;
+  } catch (error) {
+    console.warn('Could not start the paired library service', error);
+    return false;
+  }
+}
+
+function readAgentConfig() {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null;
+    const saved = JSON.parse(fs.readFileSync(agentFile(), 'utf8'));
+    return { id: saved.id, token: safeStorage.decryptString(Buffer.from(saved.token, 'base64')) };
+  } catch { return null; }
+}
 
 const MAIN_WINDOW_OPTS = {
   width: 1120,
@@ -50,6 +89,8 @@ function createWindow() {
       allowRunningInsecureContent: false
     }
   });
+  mainWindow = win;
+  win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   // Open external links in browser
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -61,10 +102,16 @@ function createWindow() {
 
 app.whenReady().then(() => {
   libraryDir();
+  const agent = readAgentConfig();
+  if (agent) startCloudServerAgent(agent);
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+process.on('sb-cloud-instance-added', (book) => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('cloud-instance-added', book);
 });
 
 app.on('window-all-closed', () => {
@@ -74,6 +121,52 @@ app.on('window-all-closed', () => {
 // ---- IPC ----
 
 ipcMain.handle('get-library-dir', () => libraryDir());
+
+ipcMain.handle('save-cloud-book', async (event, { fileName, bytes }) => {
+  try {
+    const safeExt = path.extname(String(fileName || '')).toLowerCase();
+    if (!['.epub', '.pdf', '.mp3', '.m4a', '.m4b', '.wav', '.ogg', '.opus', '.flac', '.aac'].includes(safeExt)) return { error: 'Unsupported book format' };
+    const targetName = uniqueTarget(libraryDir(), path.basename(String(fileName)));
+    const targetPath = path.join(libraryDir(), targetName);
+    fs.writeFileSync(targetPath, Buffer.from(bytes));
+    return { fileName: targetName, storedPath: targetPath, size: fs.statSync(targetPath).size };
+  } catch (error) { return { error: String(error && error.message || error) }; }
+});
+
+ipcMain.handle('get-cloud-session', () => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null;
+    return JSON.parse(safeStorage.decryptString(fs.readFileSync(cloudSessionFile())));
+  } catch { return null; }
+});
+ipcMain.handle('save-cloud-session', (event, value) => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return false;
+    if (!value) { try { fs.unlinkSync(cloudSessionFile()); } catch {} return true; }
+    fs.writeFileSync(cloudSessionFile(), safeStorage.encryptString(JSON.stringify(value)));
+    return true;
+  } catch (error) { console.warn('Could not save account session', error); return false; }
+});
+
+ipcMain.handle('configure-cloud-agent', async (event, config) => {
+  try {
+    if (config && config.disconnect) {
+      try { fs.unlinkSync(agentFile()); } catch {}
+      delete process.env.SB_CLOUD_SERVER_ID;
+      delete process.env.SB_CLOUD_SERVER_TOKEN;
+      if (cloudServerRuntime && cloudServerRuntime.stopAgent) cloudServerRuntime.stopAgent();
+      cloudAgentStarted = false;
+      return true;
+    }
+    if (!config || !/^[0-9a-f-]{36}$/i.test(String(config.id)) || String(config.token || '').length < 30) return false;
+    if (!safeStorage.isEncryptionAvailable()) return false;
+    fs.mkdirSync(app.getPath('userData'), { recursive: true });
+    fs.writeFileSync(agentFile(), JSON.stringify({
+      id: String(config.id), token: safeStorage.encryptString(String(config.token)).toString('base64')
+    }));
+    return startCloudServerAgent({ id: String(config.id), token: String(config.token) });
+  } catch (error) { console.warn('Could not pair this computer', error); return false; }
+});
 
 // The phone/web client reads the library through server/server.js, which cannot
 // see the renderer's localStorage. So the app mirrors its book list here.

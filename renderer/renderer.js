@@ -25,6 +25,8 @@ let sectionHi = null; // {fid, sid} highlighted section
 let suppressCtxMenu = false; // a drag just ended: swallow the following contextmenu
 let lasso = null; // right-button marquee: {fid, pid, x0, y0, moved, rect, ids}
 let autoPanRaf = 0; // rAF handle for chart edge auto-scroll while dragging a node
+let edgeLayoutRaf = 0; // coalesce edge paints to one stable SVG update per frame
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
@@ -949,6 +951,16 @@ function renderFlowchart() {
   inner.style.height = dims.H + 'px';
   inner.innerHTML = '<svg id="flowEdges"><defs><marker id="flowArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#b5b5b5"></path></marker></defs></svg>';
   host.appendChild(inner);
+  const edgeSvg = inner.querySelector('#flowEdges');
+  edgeSvg.addEventListener('contextmenu', (ev) => {
+    const g = ev.target.closest && ev.target.closest('.edge');
+    if (!g) return;
+    ev.preventDefault(); ev.stopPropagation();
+    if (suppressCtxMenu) { suppressCtxMenu = false; return; }
+    showMenu(ev.clientX, ev.clientY, WEB
+      ? [{ label: 'Manage in the desktop app', action: desktopOnly }]
+      : [{ label: 'Delete this connection', danger: true, action: () => deleteEdge(fid, g.dataset.from, g.dataset.to) }]);
+  });
   host.onwheel = chartWheel;
   host.onpointerdown = (e) => {
     if (e.pointerType === 'touch') return;
@@ -1047,25 +1059,53 @@ function positionNodes(fid) {
   });
 }
 
-// Straight center-to-center edges, clipped to node boxes, with arrowheads.
+// Edge geometry is read and painted once per animation frame. Keeping the SVG
+// paths in place prevents them flickering while a node is dragged; DOMRects
+// retain fractional CSS pixels, unlike offsetLeft/Top which snap line ends.
 function layoutEdges() {
+  if (edgeLayoutRaf) return;
+  edgeLayoutRaf = requestAnimationFrame(() => {
+    edgeLayoutRaf = 0;
+    drawFlowEdges();
+  });
+}
+
+function edgeGroup(key, from, to) {
+  const group = document.createElementNS(SVG_NS, 'g');
+  group.setAttribute('class', 'edge');
+  group.dataset.edgeKey = key;
+  group.dataset.from = from;
+  group.dataset.to = to;
+  for (const cls of ['edge-hit', 'edge-line']) {
+    const p = document.createElementNS(SVG_NS, 'path');
+    p.setAttribute('class', cls);
+    group.appendChild(p);
+  }
+  return group;
+}
+
+function drawFlowEdges() {
   const host = $('#flowChart');
   const svg = $('#flowEdges');
-  if (!host || !svg) return;
+  const inner = $('#flowInner');
+  if (!host || !svg || !inner) return;
   const fid = state.currentFolderId;
   if (!fid) return;
   const d = chartDims();
   const edges = folderEdges(fid);
+  const innerRect = inner.getBoundingClientRect();
   const boxes = new Map();
   host.querySelectorAll('.flow-node').forEach(el => {
+    const r = el.getBoundingClientRect();
     boxes.set(el.dataset.nodeId, {
-      x: el.offsetLeft, y: el.offsetTop,
-      w: el.offsetWidth || NODE_W, h: el.offsetHeight || NODE_H
+      x: r.left - innerRect.left, y: r.top - innerRect.top,
+      w: r.width || NODE_W, h: r.height || NODE_H
     });
   });
-  svg.setAttribute('width', d.W);
-  svg.setAttribute('height', d.H);
-  svg.setAttribute('viewBox', `0 0 ${d.W} ${d.H}`);
+  if (svg.getAttribute('width') !== String(d.W)) svg.setAttribute('width', d.W);
+  if (svg.getAttribute('height') !== String(d.H)) svg.setAttribute('height', d.H);
+  const viewBox = `0 0 ${d.W} ${d.H}`;
+  if (svg.getAttribute('viewBox') !== viewBox) svg.setAttribute('viewBox', viewBox);
   const clip = (b, cx, cy) => {
     // param t where the center-line exits rect b toward (cx,cy)
     const dx = cx - (b.x + b.w / 2), dy = cy - (b.y + b.h / 2);
@@ -1075,7 +1115,8 @@ function layoutEdges() {
     const t = Math.min(tx, ty);
     return [b.x + b.w / 2 + dx * t, b.y + b.h / 2 + dy * t];
   };
-  let html = '<defs><marker id="flowArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 1 L 9 5 L 0 9 z" fill="#b5b5b5"></path></marker></defs>';
+  const existing = new Map(Array.from(svg.querySelectorAll('.edge'), g => [g.dataset.edgeKey, g]));
+  const keep = new Set();
   for (const e of edges) {
     const a = boxes.get(e.from), b = boxes.get(e.to);
     if (!a || !b) continue;
@@ -1083,19 +1124,17 @@ function layoutEdges() {
     const bcx = b.x + b.w / 2, bcy = b.y + b.h / 2;
     const [x1, y1] = clip(a, bcx, bcy);
     const [x2, y2] = clip(b, acx, acy);
-    const d = `M ${x1.toFixed(1)} ${y1.toFixed(1)} L ${x2.toFixed(1)} ${y2.toFixed(1)}`;
-    html += `<g class="edge" data-from="${e.from}" data-to="${e.to}"><path class="edge-hit" d="${d}"/><path class="edge-line" d="${d}"/></g>`;
+    const pathData = `M ${x1.toFixed(2)} ${y1.toFixed(2)} L ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+    const key = JSON.stringify([e.from, e.to]);
+    keep.add(key);
+    let group = existing.get(key);
+    if (!group) group = edgeGroup(key, e.from, e.to);
+    for (const path of group.children) {
+      if (path.getAttribute('d') !== pathData) path.setAttribute('d', pathData);
+    }
+    if (!group.parentNode) svg.appendChild(group);
   }
-  svg.innerHTML = html;
-  svg.querySelectorAll('.edge').forEach(g => {
-    g.oncontextmenu = (ev) => {
-      ev.preventDefault(); ev.stopPropagation();
-      if (suppressCtxMenu) { suppressCtxMenu = false; return; }
-      showMenu(ev.clientX, ev.clientY, WEB
-        ? [{ label: 'Manage in the desktop app', action: desktopOnly }]
-        : [{ label: 'Delete this connection', danger: true, action: () => deleteEdge(fid, g.dataset.from, g.dataset.to) }]);
-    };
-  });
+  for (const [key, group] of existing) if (!keep.has(key)) group.remove();
 }
 window.addEventListener('resize', () => {
   if (state.currentFolderId && !$('#orderSection').classList.contains('hidden')) {
@@ -1157,6 +1196,26 @@ async function importPaths(paths, targetFolderId = null) {
   save(); render();
   toast(added + ' book(s) added' + (skipped ? ` · ${skipped} skipped` : ''));
   // refresh covers lazily already done
+}
+
+window.addEventListener('sb-cloud-book-downloaded', async (event) => {
+  const saved = event.detail || {};
+  if (!saved.storedPath || state.books.some(book => book.storedPath === saved.storedPath)) return;
+  const type = typeOf(saved.fileName);
+  if (!type) return;
+  const book = {
+    id: uid(), title: String(saved.fileName).replace(/\.[^.]+$/, ''), author: '',
+    type, fileName: saved.fileName, storedPath: saved.storedPath,
+    folderId: null, addedAt: Date.now(), cover: '', progress: 0
+  };
+  state.books.unshift(book);
+  save(); render();
+  try { await enrichBook(book); } catch {}
+  save(); render();
+  toast('Added to Local Library');
+});
+if (window.api?.onCloudInstanceAdded) {
+  window.api.onCloudInstanceAdded((book) => window.dispatchEvent(new CustomEvent('sb-cloud-book-downloaded', { detail: book })));
 }
 
 async function pickAndImport() {
@@ -2110,6 +2169,15 @@ function applyTheme(name) {
   }
 }
 
+function enterView(view) {
+  if (!view || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  view.classList.remove('view-enter');
+  // Restart the short entrance animation when returning to an existing view.
+  void view.offsetWidth;
+  view.classList.add('view-enter');
+  view.addEventListener('animationend', () => view.classList.remove('view-enter'), { once: true });
+}
+
 function buildThemeGrid() {
   const grid = $('#themeGrid');
   if (!grid) return;
@@ -2119,6 +2187,8 @@ function buildThemeGrid() {
     card.type = 'button';
     card.className = 'theme-card' + (state.settings.theme === t.id ? ' active' : '');
     card.title = t.name + ' theme';
+    card.setAttribute('aria-label', t.name + ' theme');
+    card.setAttribute('aria-pressed', String(state.settings.theme === t.id));
     card.innerHTML =
       '<span class="theme-swatches">' +
         t.sw.map(c => `<i style="background:${c}"></i>`).join('') +
@@ -2191,6 +2261,7 @@ async function openBook(book) {
   save();
   $('#libraryView').classList.add('hidden');
   $('#readerView').classList.remove('hidden');
+  enterView($('#readerView'));
   $('#readerTitle').textContent = book.title;
   const chapCount = book.type === 'audio' && Array.isArray(book.chapters)
     ? book.chapters.filter(c => c && isFinite(c.start)).length : 0;
@@ -2309,6 +2380,7 @@ function closeReader() {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   $('#readerView').classList.add('hidden');
   $('#libraryView').classList.remove('hidden');
+  enterView($('#libraryView'));
   render();
 }
 

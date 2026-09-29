@@ -18,10 +18,13 @@ const fsp = require('fs/promises');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
+const { pipeline } = require('stream/promises');
+const { Readable } = require('stream');
 
 const ROOT = path.join(__dirname, '..');
 const RENDERER = path.join(ROOT, 'renderer');
 const SHIM = path.join(ROOT, 'web', 'api-shim.js');
+const CLOUD_CLIENT = path.join(RENDERER, 'cloud-client.js');
 
 const PORT = +(process.env.SB_PORT || 8787);
 const HOST = process.env.SB_HOST || '0.0.0.0';
@@ -321,6 +324,7 @@ async function serveClient(res, urlPath) {
     '/renderer.js': path.join(RENDERER, 'renderer.js'),
     '/api-shim.js': SHIM,
     '/login.js': path.join(ROOT, 'web', 'login.js'),
+    '/cloud-client.js': CLOUD_CLIENT,
     '/node_modules/jszip/dist/jszip.min.js': path.join(ROOT, 'node_modules', 'jszip', 'dist', 'jszip.min.js'),
     '/node_modules/pdfjs-dist/build/pdf.js': path.join(ROOT, 'node_modules', 'pdfjs-dist', 'build', 'pdf.js'),
     '/node_modules/pdfjs-dist/build/pdf.worker.js': path.join(ROOT, 'node_modules', 'pdfjs-dist', 'build', 'pdf.worker.js')
@@ -465,6 +469,100 @@ function lanAddresses() {
   }
   return out;
 }
+
+/* ---------------- optional online-library server agent ---------------- */
+async function installCloudInstance(job) {
+  if (!job || !job.book || !job.downloadUrl) throw new Error('The cloud job is incomplete');
+  const prior = readIndex().books.find(item => item.cloudJobId === job.jobId);
+  if (prior && prior.storedPath && fs.existsSync(prior.storedPath)) return path.basename(prior.storedPath);
+  const book = job.book;
+  const ext = path.extname(String(book.fileName || '')).slice(1).toLowerCase();
+  if (!LIB_EXTS.includes(ext)) throw new Error('Unsupported book format');
+  const response = await fetch(job.downloadUrl);
+  if (!response.ok || !response.body) throw new Error('Could not download the online book');
+  const contentLength = Number(response.headers.get('content-length') || 0);
+  if (contentLength > 2 * 1024 * 1024 * 1024) throw new Error('Book is larger than the local-copy limit');
+  const safeName = path.basename(String(book.fileName)).replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 180) || `book.${ext}`;
+  const targetName = uniqueLocalTarget(LIBRARY_DIR, safeName);
+  const targetPath = path.join(LIBRARY_DIR, targetName);
+  const tempPath = targetPath + '.download-' + crypto.randomBytes(6).toString('hex');
+  try {
+    await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(tempPath, { flags: 'wx' }));
+    const stat = fs.statSync(tempPath);
+    if (stat.size < 1 || stat.size > 2 * 1024 * 1024 * 1024) throw new Error('Downloaded book has an invalid size');
+    fs.renameSync(tempPath, targetPath);
+    const indexExists = fs.existsSync(INDEX_FILE);
+    const current = readIndex();
+    const existing = current.books.length ? current : scanLibrary();
+    const record = {
+      id: crypto.randomUUID(), title: String(book.title || path.basename(targetName, path.extname(targetName))).slice(0, 180),
+      author: String(book.author || '').slice(0, 180), type: ext === 'epub' ? 'epub' : ext === 'pdf' ? 'pdf' : 'audio',
+      fileName: targetName, storedPath: targetPath, coverPath: null, folderId: null,
+      addedAt: Date.now(), progress: 0, progressSeconds: 0, cloudJobId: job.jobId
+    };
+    const nextBooks = [...existing.books, record];
+    const nextFolders = existing.folders || [];
+    if (indexExists) {
+      indexCache = { mtime: fs.statSync(INDEX_FILE).mtimeMs, books: nextBooks, folders: nextFolders };
+      writeIndex();
+    } else {
+      fs.writeFileSync(INDEX_FILE, JSON.stringify({ version: 1, updatedAt: Date.now(), books: nextBooks, folders: nextFolders }));
+      indexCache = { mtime: 0, books: nextBooks, folders: nextFolders };
+    }
+    process.emit('sb-cloud-instance-added', { fileName: targetName, storedPath: targetPath, size: stat.size });
+    return targetName;
+  } catch (error) {
+    try { fs.unlinkSync(tempPath); } catch {}
+    try { fs.unlinkSync(targetPath); } catch {}
+    throw error;
+  }
+}
+function uniqueLocalTarget(dir, fileName) {
+  const ext = path.extname(fileName), base = path.basename(fileName, ext);
+  let candidate = fileName, i = 1;
+  while (fs.existsSync(path.join(dir, candidate))) candidate = `${base} (${i++})${ext}`;
+  return candidate;
+}
+let cloudAgentTimer = null;
+function startCloudAgent(config = {}) {
+  const id = String(config.id || process.env.SB_CLOUD_SERVER_ID || '');
+  const token = String(config.token || process.env.SB_CLOUD_SERVER_TOKEN || '');
+  const endpoint = String(process.env.SB_CLOUD_API_URL || 'https://sailingbooks.vercel.app/api/cloud').replace(/\/+$/, '');
+  if (!id || token.length < 30) return;
+  if (cloudAgentTimer) clearInterval(cloudAgentTimer);
+  let running = false;
+  const poll = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const response = await fetch(`${endpoint}/servers/${encodeURIComponent(id)}/agent/jobs`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: '{}'
+      });
+      if (!response.ok) throw new Error(`Cloud agent returned ${response.status}`);
+      const data = await response.json();
+      for (const job of data.jobs || []) {
+        let error = '';
+        try { await installCloudInstance(job); }
+        catch (e) { error = String(e && e.message || e); console.error('Online local-copy failed:', error); }
+        try {
+          await fetch(`${endpoint}/servers/${encodeURIComponent(id)}/agent/complete`, {
+            method: 'POST', headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+            body: JSON.stringify({ jobId: job.jobId, error })
+          });
+        } catch (e) { console.warn('Could not report local-copy status:', e && e.message); }
+      }
+    } catch (error) {
+      console.warn('Online server agent is not connected:', error && error.message || error);
+    } finally { running = false; }
+  };
+  poll();
+  cloudAgentTimer = setInterval(poll, 25000);
+  cloudAgentTimer.unref();
+}
+function stopCloudAgent() {
+  if (cloudAgentTimer) clearInterval(cloudAgentTimer);
+  cloudAgentTimer = null;
+}
 // Exposing this to the internet with a weak password would be a bad idea, so
 // make that an explicit choice.
 if (process.env.SB_REQUIRE_PASSWORD === '1' && AUTH.generated) {
@@ -490,14 +588,17 @@ server.on('error', (e) => {
   } else {
     console.error('\n  Server error:', e && e.message ? e.message : e, '\n');
   }
-  process.exit(1);
+  if (!process.env.SB_DESKTOP_EMBEDDED) process.exit(1);
 });
 server.listen(PORT, HOST, () => {
   console.log('\n  Sailing Books — library server');
   console.log('  ------------------------------------------------');
   console.log(`  On this laptop:  http://localhost:${PORT}`);
   for (const a of lanAddresses()) console.log(`  On your phone:   http://${a}:${PORT}   (same Wi-Fi)`);
-  console.log(`\n  Password: ${AUTH.password}${AUTH.generated ? '   (generated — saved to ' + authFile() + ')' : '   (SB_PASSWORD)'}`);
+  if (!process.env.SB_DESKTOP_EMBEDDED) console.log(`\n  Password: ${AUTH.password}${AUTH.generated ? '   (generated — saved to ' + authFile() + ')' : '   (SB_PASSWORD)'}`);
   if (!process.env.SB_PASSWORD) console.log('  Want to reach it from anywhere? Run:  npm run tunnel');
   console.log('  The laptop must stay on and awake while the phone is reading.\n');
+  startCloudAgent();
 });
+
+module.exports = { startAgent: startCloudAgent, stopAgent: stopCloudAgent };
