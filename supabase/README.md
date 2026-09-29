@@ -16,7 +16,7 @@ Add these variables to the `sailingbooks` Vercel project for Production (and Pre
 | --- | --- |
 | `SB_SUPABASE_URL` | Project URL from Supabase API settings |
 | `SB_SUPABASE_ANON_KEY` | Supabase publishable/anon key |
-| `SB_SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role secret; server-side only |
+| `SB_SUPABASE_SERVICE_ROLE_KEY` | Supabase secret key (`sb_secret_…`) or legacy `service_role` key; server-side only |
 | `SB_ADMIN_EMAIL` | The account email that receives unlimited storage |
 
 Redeploy after adding the variables. The public config route returns only the URL and anon key. The service-role key and Admin email are read by the Vercel function only.

@@ -17,7 +17,15 @@ function config() {
   };
 }
 function serviceHeaders(c, extra = {}) {
-  return { apikey: c.serviceKey, Authorization: `Bearer ${c.serviceKey}`, 'Content-Type': 'application/json', ...extra };
+  const headers = { apikey: c.serviceKey, 'Content-Type': 'application/json' };
+  // Supabase's current sb_secret_* API keys are opaque keys, not JWTs. The
+  // gateway maps them to service_role from apikey; sending one as a Bearer
+  // token makes PostgREST interpret it as a JWT and can produce permission
+  // errors. Legacy service_role keys are JWTs and still need Authorization.
+  if (!String(c.serviceKey || '').startsWith('sb_secret_')) {
+    headers.Authorization = `Bearer ${c.serviceKey}`;
+  }
+  return { ...headers, ...extra };
 }
 async function sb(c, path, options = {}, service = true) {
   const headers = service ? serviceHeaders(c, options.headers) : { apikey: c.anonKey, ...options.headers };
