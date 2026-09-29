@@ -249,7 +249,10 @@ module.exports = async function handler(req, res) {
       if (!EXTENSIONS.has(ext)) return send(res, 400, { error: `“${fileName}” has an unsupported .${ext || '(none)'} extension. Choose an EPUB, PDF, or supported audiobook file.` });
       if (!Number.isSafeInteger(bytes) || bytes < 1 || bytes > 2 * 1024 * 1024 * 1024) return send(res, 400, { error: 'The selected file size is not supported.' });
       const id = crypto.randomUUID();
-      const storagePath = `${user.id}/${id}/${fileName}`;
+      // Keep the user's original filename in cloud_books.file_name, but use a
+      // short ASCII object key. Supabase Storage rejects some Unicode and
+      // typographic punctuation in object names with an opaque 400 response.
+      const storagePath = `${user.id}/${id}/book.${ext}`;
       const reserved = await sb(c, rpcPath('reserve_online_book_upload'), {
         method: 'POST', body: JSON.stringify({
           p_user_id: user.id, p_book_id: id, p_file_name: fileName,

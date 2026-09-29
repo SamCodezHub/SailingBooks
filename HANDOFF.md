@@ -52,7 +52,7 @@ filesystem.
 ## 2. Current state
 
 - Repo: `C:\Users\Manjunath\Documents\SailingBooks`
-- Current app version: 1.0.4. Previous release installers are retained in their
+- Current app version: 1.0.5. Previous release installers are retained in their
   versioned output folders.
 - Production web frontend: `https://sailingbooks.vercel.app`; its serverless
   cloud API is in `api/cloud/[...route].js`.

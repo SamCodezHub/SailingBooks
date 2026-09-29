@@ -351,7 +351,11 @@
       const token = await accessToken();
       const objectUrl = `${cfg.url}/storage/v1/object/${enc(reservation.bucket)}/${reservation.storagePath.split('/').map(enc).join('/')}`;
       const response = await fetch(objectUrl, { method: 'POST', headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token, 'Content-Type': mimeFor(fileName), 'x-upsert': 'false' }, body });
-      if (!response.ok) throw new Error(`${fileName}: storage rejected this upload (${response.status}).`);
+      if (!response.ok) {
+        const storageError = await response.clone().json().catch(() => ({}));
+        const detail = storageError.message || storageError.error || storageError.code;
+        throw new Error(`${fileName}: storage rejected this upload (${response.status})${detail ? `: ${detail}` : '.'}`);
+      }
       await api(`/books/${enc(reservation.book.id)}/complete`, { method: 'POST', body: '{}' });
     } catch (error) {
       await api(`/books/${enc(reservation.book.id)}`, { method: 'DELETE' }).catch(() => {});

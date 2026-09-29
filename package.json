@@ -1,7 +1,7 @@
 {
   "name": "sailing-books",
   "productName": "Sailing Books",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Sailing Books — minimal EPUB & audiobook library and reader",
   "main": "main.js",
   "author": "Sailing Books",
