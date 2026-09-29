@@ -9,36 +9,57 @@ function send(res, status, value) {
   return res.json(value);
 }
 function config() {
+  const serviceKeys = [
+    process.env.SB_SUPABASE_SERVICE_ROLE_KEY,
+    process.env.SUPABASE_SECRET_KEY,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  ].map(value => String(value || '').trim()).filter((value, index, values) =>
+    value && !value.startsWith('sb_publishable_') && values.indexOf(value) === index
+  );
   return {
     url: String(process.env.SB_SUPABASE_URL || '').replace(/\/$/, ''),
     anonKey: process.env.SB_SUPABASE_ANON_KEY || '',
-    serviceKey: process.env.SB_SUPABASE_SERVICE_ROLE_KEY || '',
+    serviceKey: serviceKeys[0] || '',
+    serviceKeys,
     adminEmail: String(process.env.SB_ADMIN_EMAIL || '').trim().toLowerCase()
   };
 }
-function serviceHeaders(c, extra = {}) {
-  const headers = { apikey: c.serviceKey, 'Content-Type': 'application/json' };
+function serviceHeaders(key, extra = {}) {
+  const headers = { apikey: key, 'Content-Type': 'application/json' };
   // Supabase's current sb_secret_* API keys are opaque keys, not JWTs. The
   // gateway maps them to service_role from apikey; sending one as a Bearer
   // token makes PostgREST interpret it as a JWT and can produce permission
   // errors. Legacy service_role keys are JWTs and still need Authorization.
-  if (!String(c.serviceKey || '').startsWith('sb_secret_')) {
-    headers.Authorization = `Bearer ${c.serviceKey}`;
+  if (!String(key || '').startsWith('sb_secret_')) {
+    headers.Authorization = `Bearer ${key}`;
   }
   return { ...headers, ...extra };
 }
 async function sb(c, path, options = {}, service = true) {
-  const headers = service ? serviceHeaders(c, options.headers) : { apikey: c.anonKey, ...options.headers };
-  const response = await fetch(c.url + path, { ...options, headers });
-  const text = await response.text();
-  let data;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  if (!response.ok) {
-    const error = new Error(data && (data.message || data.error_description || data.error) || `Supabase request failed (${response.status})`);
-    error.status = response.status;
-    throw error;
+  const keys = service ? (c.serviceKeys?.length ? c.serviceKeys : [c.serviceKey]).filter(Boolean) : [null];
+  let lastError;
+  for (let index = 0; index < keys.length; index++) {
+    const key = keys[index];
+    const headers = service ? serviceHeaders(key, options.headers) : { apikey: c.anonKey, ...options.headers };
+    const response = await fetch(c.url + path, { ...options, headers });
+    const text = await response.text();
+    let data;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (response.ok) {
+      if (service && key !== c.serviceKey) {
+        c.serviceKey = key;
+        c.serviceKeys = [key, ...keys.filter(candidate => candidate !== key)];
+      }
+      return data;
+    }
+    lastError = new Error(data && (data.message || data.error_description || data.error) || `Supabase request failed (${response.status})`);
+    lastError.status = response.status;
+    // A misconfigured first key can still pass reads on tables exposed to
+    // authenticated users. Retry with the other configured server-only keys
+    // when this endpoint proves that the key lacks elevated permissions.
+    if (!service || ![401, 403].includes(response.status) || index === keys.length - 1) throw lastError;
   }
-  return data;
+  throw lastError || new Error('Supabase service key is not configured.');
 }
 async function requireUser(req, c) {
   const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
@@ -106,7 +127,15 @@ module.exports = async function handler(req, res) {
   const queryRoute = Array.isArray(req.query.route) ? req.query.route : String(req.query.route || '').split('/').filter(Boolean);
   const route = pathRoute.length ? pathRoute : queryRoute;
   if (req.method === 'GET' && route.length === 1 && route[0] === 'config') {
-    return send(res, 200, { configured: !!(c.url && c.anonKey && c.serviceKey), url: c.url, anonKey: c.anonKey });
+    const configured = !!(c.url && c.anonKey && c.serviceKey);
+    let serviceReady = false;
+    if (configured) {
+      try {
+        await sb(c, '/rest/v1/cloud_servers?select=id&limit=0');
+        serviceReady = true;
+      } catch {}
+    }
+    return send(res, 200, { configured, serviceReady, url: c.url, anonKey: c.anonKey });
   }
   if (!c.url || !c.anonKey || !c.serviceKey) return send(res, 503, { error: 'Cloud library is not configured yet. Add the Supabase environment settings to the Vercel project.' });
 

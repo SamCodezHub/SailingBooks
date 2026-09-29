@@ -58,6 +58,11 @@ create policy "Users can read their server jobs" on public.server_jobs
   for select to authenticated using (auth.uid() = user_id);
 revoke all on public.server_jobs from anon, authenticated;
 
+-- The Vercel API verifies the signed-in user in Auth, then accesses these
+-- private tables with the server-only Supabase secret/service_role key.
+grant usage on schema public to service_role;
+grant all privileges on table public.cloud_books, public.cloud_servers, public.server_jobs to service_role;
+
 create or replace function public.reserve_online_book_upload(
   p_user_id uuid, p_book_id uuid, p_file_name text, p_book_type text,
   p_size_bytes bigint, p_storage_path text, p_quota_bytes bigint

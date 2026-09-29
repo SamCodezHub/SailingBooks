@@ -57,6 +57,7 @@
     if (!response.ok) throw new Error('Could not load the account service.');
     cloudConfig = await response.json();
     if (!cloudConfig.configured) throw new Error('Online Library is waiting for its Supabase setup. Add the project URL, anon key, and service key to Vercel, then run the database setup SQL.');
+    if (cloudConfig.serviceReady === false) throw new Error('The account server key cannot access the library tables. In Vercel Production, set SB_SUPABASE_SERVICE_ROLE_KEY to the Supabase secret key (sb_secret_…) or legacy service_role key, then redeploy.');
     return cloudConfig;
   }
   async function authCall(path, body, token) {
