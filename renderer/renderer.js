@@ -1216,7 +1216,6 @@ window.addEventListener('sb-cloud-book-downloaded', async (event) => {
   save(); render();
   try { await enrichBook(book); } catch {}
   save(); render();
-  toast('Added to Local Library');
 });
 window.addEventListener('sb-cloud-instance-created', async () => {
   if (!WEB || BROWSER_LOCAL) return;

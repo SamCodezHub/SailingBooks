@@ -397,6 +397,7 @@
     return null;
   }
   async function downloadBook(book) {
+    setMessage('#cloudUploadStatus', '');
     try {
       const response = await apiFile(`/books/${enc(book.id)}/file`);
       const bytes = new Uint8Array(await response.arrayBuffer());
@@ -404,14 +405,12 @@
         const saved = await window.api.saveCloudBook(book.file_name, bytes);
         if (!saved?.storedPath) throw new Error(saved?.error || 'Could not save the book to this computer.');
         window.dispatchEvent(new CustomEvent('sb-cloud-book-downloaded', { detail: saved }));
-        setMessage('#cloudUploadStatus', `“${book.title || book.file_name}” is now in Local Library.`, 'good');
       } else {
         const blob = new Blob([bytes], { type: mimeFor(book.file_name) });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a'); link.href = url; link.download = book.file_name; link.style.display = 'none';
         document.body.appendChild(link); link.click(); link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 30000);
-        setMessage('#cloudUploadStatus', `Download started for “${book.title || book.file_name}”.`, 'good');
       }
     } catch (error) { setMessage('#cloudUploadStatus', error.message, 'bad'); }
   }
