@@ -855,7 +855,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   border-bottom: 1px solid var(--line); box-shadow: 0 3px 16px rgba(0,0,0,.025); z-index: 4;
 }
 .topbar-brand { display:flex; align-items:center; gap:9px; font-family:var(--font-display); font-weight:750; font-size:15px; white-space:nowrap; }
-.brand-mark { display:grid; place-items:center; width:29px; height:29px; border-radius:10px; color:var(--on-accent); background:var(--accent); font-size:15px; }
+.brand-mark { display:block; width:32px; height:32px; flex:0 0 auto; border-radius:9px; object-fit:contain; background:var(--panel); }
 .library-nav { display:flex; align-items:center; gap:4px; padding:3px; border:1px solid var(--line); border-radius:999px; background:var(--soft); }
 .nav-tab { border:0; border-radius:999px; padding:7px 11px; color:var(--muted); background:transparent; font-family:var(--font-ui); font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:background .18s ease,color .18s ease,transform .18s var(--ease-spring); }
 .nav-tab:hover { color:var(--ink); transform:translateY(-1px); }
@@ -937,7 +937,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 @media (max-width:760px) {
   #topbar { gap:8px; padding:9px 10px; min-height:56px; }
   .topbar-brand { font-size:0; gap:0; }
-  .brand-mark { font-size:14px; }
+  .brand-mark { width:28px; height:28px; }
   .library-nav { gap:1px; }
   .nav-tab { padding:7px 8px; font-size:10px; }
   #searchInput { width:min(140px,24vw); padding:8px 6px; font-size:12px; }

@@ -32,6 +32,8 @@ fs.writeFileSync(path.join(OUT, 'renderer.js'), read(path.join(ROOT, 'renderer',
 fs.writeFileSync(path.join(OUT, 'api-shim.js'), read(path.join(__dirname, 'api-shim.js')));
 fs.writeFileSync(path.join(OUT, 'login.js'), read(path.join(__dirname, 'login.js')));
 fs.writeFileSync(path.join(OUT, 'cloud-client.js'), read(path.join(ROOT, 'renderer', 'cloud-client.js')));
+fs.mkdirSync(path.join(OUT, 'assets'), { recursive: true });
+fs.copyFileSync(path.join(ROOT, 'assets', 'icon-header.png'), path.join(OUT, 'assets', 'icon-header.png'));
 fs.writeFileSync(path.join(OUT, 'vercel.json'), JSON.stringify({ cleanUrls: true }, null, 2));
 
 // index.html and the PDF worker reach for ../node_modules/... — on a static

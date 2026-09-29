@@ -14,7 +14,10 @@
   const hostedLanding = !!(window.api && window.api.mode === 'web' && !window.SB_SERVED_BY_LAPTOP);
 
   function apiBase() {
-    if (location.protocol !== 'file:' && !window.SB_SERVED_BY_LAPTOP && /sailingbooks\.vercel\.app$/i.test(location.hostname)) return location.origin + '/api/cloud';
+    // Keep hosted builds on their own origin, including Vercel preview/custom
+    // domains. That avoids cross-origin preflights for the account API. A page
+    // served by the laptop or Electron still uses the production cloud API.
+    if (location.protocol !== 'file:' && !window.SB_SERVED_BY_LAPTOP) return location.origin + '/api/cloud';
     return API_BASE;
   }
   function setMessage(id, message, kind = '') {
@@ -53,7 +56,9 @@
   }
   async function loadConfig() {
     if (cloudConfig) return cloudConfig;
-    const response = await fetch(apiBase() + '/config', { cache: 'no-store' });
+    let response;
+    try { response = await fetch(apiBase() + '/config', { cache: 'no-store' }); }
+    catch { throw new Error('Could not reach the Sailing Books account service. Check your connection and refresh the page.'); }
     if (!response.ok) throw new Error('Could not load the account service.');
     cloudConfig = await response.json();
     if (!cloudConfig.configured) throw new Error('Online Library is waiting for its Supabase setup. Add the project URL, anon key, and service key to Vercel, then run the database setup SQL.');
@@ -62,10 +67,13 @@
   }
   async function authCall(path, body, token) {
     const cfg = await loadConfig();
-    const response = await fetch(cfg.url + '/auth/v1/' + path, {
-      method: 'POST', headers: { apikey: cfg.anonKey, 'content-type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
-      body: JSON.stringify(body)
-    });
+    let response;
+    try {
+      response = await fetch(cfg.url + '/auth/v1/' + path, {
+        method: 'POST', headers: { apikey: cfg.anonKey, 'content-type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+        body: JSON.stringify(body)
+      });
+    } catch { throw new Error('Could not reach the sign-in service. Check your connection and try again.'); }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.msg || data.message || data.error_description || data.error || 'Account request failed.');
     return data;
@@ -83,9 +91,12 @@
   }
   async function api(path, options = {}, retry = true) {
     const token = await accessToken();
-    const response = await fetch(apiBase() + path, {
-      ...options, headers: { ...(options.body && !(options.body instanceof Blob) ? { 'content-type': 'application/json' } : {}), ...(options.headers || {}), Authorization: 'Bearer ' + token }
-    });
+    let response;
+    try {
+      response = await fetch(apiBase() + path, {
+        ...options, headers: { ...(options.body && !(options.body instanceof Blob) ? { 'content-type': 'application/json' } : {}), ...(options.headers || {}), Authorization: 'Bearer ' + token }
+      });
+    } catch { throw new Error('Could not reach the Sailing Books cloud service. Check your connection and try again.'); }
     const data = await response.json().catch(() => ({}));
     if (response.status === 401 && retry && session?.refresh_token) { await refreshToken(); return api(path, options, false); }
     if (!response.ok) throw new Error(data.error || 'Cloud request failed (' + response.status + ').');
