@@ -11,6 +11,7 @@
   let books = [];
   let servers = [];
   let account = null;
+  let refreshPromise = null;
   const hostedLanding = !!(window.api && window.api.mode === 'web' && !window.SB_SERVED_BY_LAPTOP);
 
   function apiBase() {
@@ -26,6 +27,18 @@
     el.textContent = message || '';
     el.classList.toggle('bad', kind === 'bad');
     el.classList.toggle('good', kind === 'good');
+  }
+  function invalidRefreshToken(error) {
+    const message = String(error && (error.message || error.code) || '').toLowerCase();
+    return message.includes('refresh token') && /invalid|not found|already used|reuse|revoked|expired/.test(message);
+  }
+  async function expireSession() {
+    await sessionSave(null);
+    account = null; books = []; servers = [];
+    updateAccountButton();
+    showAuthMode(false);
+    setPage('landing');
+    setMessage('#cloudAuthError', 'Your sign-in expired. Your books are safe; sign in again to continue.', 'bad');
   }
   async function sessionRead() {
     if (!window.api?.mode && window.api?.getCloudSession) return await window.api.getCloudSession();
@@ -75,17 +88,58 @@
       });
     } catch { throw new Error('Could not reach the sign-in service. Check your connection and try again.'); }
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.msg || data.message || data.error_description || data.error || 'Account request failed.');
+    if (!response.ok) {
+      const error = new Error(data.msg || data.message || data.error_description || data.error || 'Account request failed.');
+      error.status = response.status;
+      error.code = data.code || data.error || data.error_description || '';
+      throw error;
+    }
     return data;
   }
-  async function refreshToken() {
+  async function rotateToken() {
+    const latest = await sessionRead();
+    if (latest?.refresh_token && latest.refresh_token !== session?.refresh_token && Number(latest.expires_at || 0) >= Date.now() + 30000) {
+      session = latest;
+      return session;
+    }
     if (!session?.refresh_token) throw new Error('Your session ended. Please sign in again.');
     const fresh = await authCall('token?grant_type=refresh_token', { refresh_token: session.refresh_token });
     await sessionSave({ ...fresh, expires_at: Date.now() + Number(fresh.expires_in || 3600) * 1000 });
     return session;
   }
+  async function refreshToken() {
+    if (refreshPromise) return refreshPromise;
+    refreshPromise = (async () => {
+      try {
+        const runWithLock = async () => {
+          const latest = await sessionRead();
+          if (latest?.refresh_token && latest.refresh_token !== session?.refresh_token && Number(latest.expires_at || 0) >= Date.now() + 30000) {
+            session = latest;
+            return session;
+          }
+          return rotateToken();
+        };
+        if (navigator.locks?.request) {
+          try { return await navigator.locks.request('sailing-books-cloud-session-refresh', runWithLock); }
+          catch (error) { if (error?.name !== 'SecurityError') throw error; }
+        }
+        return await runWithLock();
+      } catch (error) {
+        if (invalidRefreshToken(error)) {
+          await expireSession();
+          throw new Error('Your sign-in expired. Your books are safe; sign in again to continue.');
+        }
+        throw error;
+      }
+    })();
+    try { return await refreshPromise; }
+    finally { refreshPromise = null; }
+  }
   async function accessToken() {
-    if (!session?.access_token) throw new Error('Sign in to continue.');
+    if (!session?.access_token) {
+      await expireSession();
+      throw new Error('Sign in to continue.');
+    }
     if (Number(session.expires_at || 0) < Date.now() + 30000) await refreshToken();
     return session.access_token;
   }
@@ -99,7 +153,15 @@
     } catch { throw new Error('Could not reach the Sailing Books cloud service. Check your connection and try again.'); }
     const data = await response.json().catch(() => ({}));
     if (response.status === 401 && retry && session?.refresh_token) { await refreshToken(); return api(path, options, false); }
-    if (!response.ok) throw new Error(data.error || 'Cloud request failed (' + response.status + ').');
+    if (response.status === 401) {
+      await expireSession();
+      throw new Error('Your sign-in expired. Your books are safe; sign in again to continue.');
+    }
+    if (!response.ok) {
+      let route = apiBase() + path;
+      try { route = new URL(route, location.href).pathname; } catch {}
+      throw new Error(data.error || `Cloud request failed (${response.status}) at ${route}.`);
+    }
     return data;
   }
   function ext(name) { return String(name || '').split('.').pop().toLowerCase(); }

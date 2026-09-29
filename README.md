@@ -32,13 +32,13 @@ npm install
 npm start
 ```
 
-## Build the v1.0.1 .exe
+## Build the v1.0.2 .exe
 ```powershell
 cd sailing-books
 npm install
-npm run dist -- --config.directories.output=release/1.0.1
+npm run dist -- --config.directories.output=release/1.0.2
 ```
-Output: `sailing-books\release\1.0.1\Sailing-Books-Setup-1.0.1.exe`. The 1.0.0 installer remains in `dist`.
+Output: `sailing-books\release\1.0.2\Sailing-Books-Setup-1.0.2.exe`. The 1.0.0 and 1.0.1 installers remain available in `dist`.
 Install it, then launch **Sailing Books** from the Start Menu or desktop shortcut.
 Your library files are copied to `%APPDATA%\Sailing Books\Library`.
 
