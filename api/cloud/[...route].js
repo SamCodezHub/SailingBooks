@@ -125,7 +125,10 @@ module.exports = async function handler(req, res) {
     ? pathname.slice(pathname.indexOf(cloudPrefix) + cloudPrefix.length).split('/').filter(Boolean)
     : [];
   const queryRoute = Array.isArray(req.query.route) ? req.query.route : String(req.query.route || '').split('/').filter(Boolean);
-  const route = pathRoute.length ? pathRoute : queryRoute;
+  // Nested endpoints are rewritten through /api/cloud/dispatch on Vercel.
+  // Prefer its explicit route query; direct single-segment calls still use
+  // the function path or Vercel's catch-all parameter.
+  const route = queryRoute.length ? queryRoute : pathRoute;
   if (req.method === 'GET' && route.length === 1 && route[0] === 'config') {
     const configured = !!(c.url && c.anonKey && c.serviceKey);
     let serviceReady = false;

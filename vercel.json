@@ -4,6 +4,12 @@
   "buildCommand": "node web/build.js",
   "outputDirectory": "web/dist",
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/cloud/:first/:rest*",
+      "destination": "/api/cloud/dispatch?route=:first/:rest*"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
