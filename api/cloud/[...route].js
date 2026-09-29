@@ -8,6 +8,30 @@ function send(res, status, value) {
   res.status(status).setHeader('Cache-Control', 'no-store');
   return res.json(value);
 }
+async function requestBody(req) {
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === 'string' || Buffer.isBuffer(req.body)) {
+    const text = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body;
+    try { return text ? JSON.parse(text) : {}; }
+    catch { throw Object.assign(new Error('The upload request was not valid JSON. Please try again.'), { status: 400 }); }
+  }
+  // Some Vercel rewrite/runtime combinations do not populate req.body. Read
+  // the raw JSON stream in that case so fields like fileName are not lost.
+  if (req && typeof req[Symbol.asyncIterator] === 'function') {
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.length;
+      if (size > 16 * 1024) throw Object.assign(new Error('The upload request is too large.'), { status: 413 });
+      chunks.push(Buffer.from(chunk));
+    }
+    const text = Buffer.concat(chunks).toString('utf8');
+    if (!text) return {};
+    try { return JSON.parse(text); }
+    catch { throw Object.assign(new Error('The upload request was not valid JSON. Please try again.'), { status: 400 }); }
+  }
+  return {};
+}
 function config() {
   const serviceKeys = [
     process.env.SB_SUPABASE_SERVICE_ROLE_KEY,
@@ -69,7 +93,14 @@ async function requireUser(req, c) {
   return { user, accessToken: match[1], isAdmin: !!c.adminEmail && user.email.toLowerCase() === c.adminEmail };
 }
 function cleanName(value) {
-  return String(value || 'book').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 180) || 'book';
+  const name = String(value || 'book').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/\s+/g, ' ').trim() || 'book';
+  const dot = name.lastIndexOf('.');
+  if (dot < 0 || dot === name.length - 1) return name.slice(0, 180) || 'book';
+  const suffix = name.slice(dot);
+  // Keep the extension intact when a long title is shortened; the upload
+  // validator and storage object name both need the real file extension.
+  if (suffix.length >= 180) return name.slice(0, 180);
+  return name.slice(0, 180 - suffix.length) + suffix;
 }
 function rpcPath(name) { return `/rest/v1/rpc/${name}`; }
 function encodePath(value) { return String(value).split('/').map(encodeURIComponent).join('/'); }
@@ -186,11 +217,15 @@ module.exports = async function handler(req, res) {
     }
     if (route[0] === 'books' && route[1] === 'reserve' && req.method === 'POST') {
       await cleanExpiredUploads(c, user.id);
-      const body = req.body || {};
-      const fileName = cleanName(body.fileName);
+      const body = await requestBody(req);
+      const originalName = body.fileName || body.filename || body.name;
+      if (typeof originalName !== 'string' || !originalName.trim()) {
+        return send(res, 400, { error: 'The selected file name was not received. Please choose the EPUB again and retry.' });
+      }
+      const fileName = cleanName(originalName);
       const ext = fileName.split('.').pop().toLowerCase();
       const bytes = Number(body.sizeBytes);
-      if (!EXTENSIONS.has(ext)) return send(res, 400, { error: 'Choose an EPUB, PDF, or supported audiobook file.' });
+      if (!EXTENSIONS.has(ext)) return send(res, 400, { error: `“${fileName}” has an unsupported .${ext || '(none)'} extension. Choose an EPUB, PDF, or supported audiobook file.` });
       if (!Number.isSafeInteger(bytes) || bytes < 1 || bytes > 2 * 1024 * 1024 * 1024) return send(res, 400, { error: 'The selected file size is not supported.' });
       const id = crypto.randomUUID();
       const storagePath = `${user.id}/${id}/${fileName}`;
