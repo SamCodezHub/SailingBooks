@@ -87,7 +87,16 @@ module.exports = async function handler(req, res) {
     return res.end();
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
-  const route = Array.isArray(req.query.route) ? req.query.route : String(req.query.route || '').split('/').filter(Boolean);
+  // Vercel can expose catch-all params differently depending on the build
+  // output routing mode. Prefer the actual request path when it includes the
+  // function prefix, then fall back to the named catch-all query parameter.
+  const pathname = String(req.url || '').split('?')[0];
+  const cloudPrefix = '/api/cloud/';
+  const pathRoute = pathname.includes(cloudPrefix)
+    ? pathname.slice(pathname.indexOf(cloudPrefix) + cloudPrefix.length).split('/').filter(Boolean)
+    : [];
+  const queryRoute = Array.isArray(req.query.route) ? req.query.route : String(req.query.route || '').split('/').filter(Boolean);
+  const route = pathRoute.length ? pathRoute : queryRoute;
   if (req.method === 'GET' && route.length === 1 && route[0] === 'config') {
     return send(res, 200, { configured: !!(c.url && c.anonKey && c.serviceKey), url: c.url, anonKey: c.anonKey });
   }
