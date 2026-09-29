@@ -73,7 +73,9 @@
     try { response = await fetch(apiBase() + '/config', { cache: 'no-store' }); }
     catch { throw new Error('Could not reach the Sailing Books account service. Check your connection and refresh the page.'); }
     if (!response.ok) throw new Error('Could not load the account service.');
-    cloudConfig = await response.json();
+    const loaded = await response.json();
+    if (!loaded || typeof loaded !== 'object') throw new Error('The account service returned an invalid configuration. Refresh the page and try again.');
+    cloudConfig = loaded;
     if (!cloudConfig.configured) throw new Error('Online Library is waiting for its Supabase setup. Add the project URL, anon key, and service key to Vercel, then run the database setup SQL.');
     if (cloudConfig.serviceReady === false) throw new Error('The account server key cannot access the library tables. In Vercel Production, set SB_SUPABASE_SERVICE_ROLE_KEY to the Supabase secret key (sb_secret_…) or legacy service_role key, then redeploy.');
     return cloudConfig;
@@ -288,6 +290,9 @@
     await renderServers();
   }
   async function uploadOne(item) {
+    // A restored sign-in session skips authCall(), so it may reach the upload
+    // path before the public Supabase config has ever been loaded in this tab.
+    const cfg = await loadConfig();
     const fileName = item.name;
     const bookType = typeFor(fileName);
     if (!bookType) throw new Error(`${fileName}: choose an EPUB, PDF, or audiobook file.`);
@@ -300,8 +305,8 @@
     const reservation = await api('/books/reserve', { method: 'POST', body: JSON.stringify({ fileName, sizeBytes: body.size }) });
     try {
       const token = await accessToken();
-      const objectUrl = `${cloudConfig.url}/storage/v1/object/${enc(reservation.bucket)}/${reservation.storagePath.split('/').map(enc).join('/')}`;
-      const response = await fetch(objectUrl, { method: 'POST', headers: { apikey: cloudConfig.anonKey, Authorization: 'Bearer ' + token, 'Content-Type': mimeFor(fileName), 'x-upsert': 'false' }, body });
+      const objectUrl = `${cfg.url}/storage/v1/object/${enc(reservation.bucket)}/${reservation.storagePath.split('/').map(enc).join('/')}`;
+      const response = await fetch(objectUrl, { method: 'POST', headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token, 'Content-Type': mimeFor(fileName), 'x-upsert': 'false' }, body });
       if (!response.ok) throw new Error(`${fileName}: storage rejected this upload (${response.status}).`);
       await api(`/books/${enc(reservation.book.id)}/complete`, { method: 'POST', body: '{}' });
     } catch (error) {
