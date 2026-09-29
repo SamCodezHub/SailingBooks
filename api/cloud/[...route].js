@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const { pipeline } = require('stream/promises');
+const { Readable } = require('stream');
 
 const BUCKET = 'sailing-books';
 const QUOTA_BYTES = 1024 * 1024 * 1024;
@@ -84,6 +86,25 @@ async function sb(c, path, options = {}, service = true) {
     if (!service || ![401, 403].includes(response.status) || index === keys.length - 1) throw lastError;
   }
   throw lastError || new Error('Supabase service key is not configured.');
+}
+async function sbResponse(c, path, options = {}) {
+  const keys = c.serviceKeys?.length ? c.serviceKeys : [c.serviceKey];
+  let lastResponse;
+  for (let index = 0; index < keys.length; index++) {
+    const key = keys[index];
+    const response = await fetch(c.url + path, { ...options, headers: serviceHeaders(key, options.headers) });
+    if (response.ok) {
+      if (key !== c.serviceKey) {
+        c.serviceKey = key;
+        c.serviceKeys = [key, ...keys.filter(candidate => candidate !== key)];
+      }
+      return response;
+    }
+    lastResponse = response;
+    if (![401, 403].includes(response.status) || index === keys.length - 1) break;
+  }
+  const status = lastResponse?.status === 404 ? 404 : 502;
+  throw Object.assign(new Error(status === 404 ? 'The book file is missing from private storage.' : 'Private storage could not provide this book. Check the Supabase storage setup and try again.'), { status });
 }
 async function requireUser(req, c) {
   const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
@@ -254,6 +275,22 @@ module.exports = async function handler(req, res) {
       if (!book || book.status !== 'ready') return send(res, 404, { error: 'Book not found' });
       return send(res, 200, { url: await signedUrl(c, book.storage_path) });
     }
+    if (route[0] === 'books' && route[1] && route[2] === 'file' && req.method === 'GET') {
+      const book = await getBook(c, route[1], user.id);
+      if (!book || book.status !== 'ready') return send(res, 404, { error: 'Book not found' });
+      const response = await sbResponse(c, `/storage/v1/object/${encodeURIComponent(BUCKET)}/${encodePath(book.storage_path)}`);
+      const ext = String(book.file_name || '').split('.').pop().toLowerCase();
+      const mime = ({ epub: 'application/epub+zip', pdf: 'application/pdf', mp3: 'audio/mpeg', m4a: 'audio/mp4', m4b: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac', aac: 'audio/aac' })[ext] || 'application/octet-stream';
+      res.status(200);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(book.file_name || 'book')}`);
+      const length = response.headers.get('content-length');
+      if (length) res.setHeader('Content-Length', length);
+      if (!response.body) return res.end();
+      await pipeline(Readable.fromWeb(response.body), res);
+      return;
+    }
     if (route[0] === 'books' && route[1] && req.method === 'DELETE') {
       const book = await getBook(c, route[1], user.id);
       if (!book) return send(res, 404, { error: 'Book not found' });
@@ -297,9 +334,15 @@ module.exports = async function handler(req, res) {
       });
       return send(res, 201, { job: rows[0] });
     }
+    if (route[0] === 'servers' && route[1] && route[2] === 'instances' && route[3] && req.method === 'GET') {
+      const rows = await sb(c, `/rest/v1/server_jobs?id=eq.${encodeURIComponent(route[3])}&server_id=eq.${encodeURIComponent(route[1])}&user_id=eq.${user.id}&select=id,status,result_message,created_at,completed_at`);
+      if (!rows || !rows.length) return send(res, 404, { error: 'Local copy job not found' });
+      return send(res, 200, { job: rows[0] });
+    }
     return send(res, 404, { error: 'Unknown cloud library route' });
   } catch (error) {
     console.error('cloud api error', error && error.message);
+    if (res.headersSent) { try { res.destroy(error); } catch {} return; }
     return send(res, error.status || 500, { error: error.status ? error.message : 'Cloud library request failed. Check its Supabase setup and try again.' });
   }
 };

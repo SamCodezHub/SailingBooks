@@ -4,13 +4,21 @@ Written by an AI that worked on this project across one long session. It is a
 map of what exists, what was done, what is broken, and the traps that cost time —
 so the next person (or the next AI) does not have to rediscover them.
 
+> **Architecture update (2026-09):** The notes below began as documentation for
+> the original laptop-only app. The current release also has Supabase accounts,
+> a private Online Library, Vercel server APIs, a browser-local library, and
+> laptop server pairing. Treat claims below that say there are no accounts or
+> uploads as historical. Current storage locations and setup are documented in
+> `README.md` and `supabase/README.md`.
+
 ---
 
 ## 1. What this is
 
-A **local-first** library and reader for EPUBs, PDFs and audiobooks, written as an
-Electron desktop app with a matching browser/phone client. No accounts, no cloud,
-no upload. The books never leave the laptop; the phone just points back at it.
+A library and reader for EPUBs, PDFs and audiobooks, written as an Electron
+desktop app with a matching web app. It supports a local desktop library, a
+browser-local library, and an authenticated Supabase Online Library. A paired
+laptop server can download online books into its own local library.
 
 **The one architectural idea that explains everything else:**
 
@@ -33,29 +41,30 @@ no upload. The books never leave the laptop; the phone just points back at it.
 appears in both. The server serves the desktop's own `renderer.js`, so there is
 only ever one copy of the app.
 
-`const WEB = !!(window.api && window.api.mode === 'web')` is the single switch
-that changes: where the library comes from, scroll-only EPUBs, Clean reading
-mode, and which actions are disabled on the phone.
+`const WEB = !!(window.api && window.api.mode === 'web')` selects the browser
+bridge. The hosted app uses `renderer/cloud-client.js` for Supabase auth, online
+books, and paired servers; `web/api-shim.js` stores the hosted website's Local
+Library in that browser's IndexedDB. Electron uses `preload.js` and the Windows
+filesystem.
 
 ---
 
 ## 2. Current state
 
 - Repo: `C:\Users\Manjunath\Documents\SailingBooks`
-- **Last commit by me: `8def252`** ("Make every control readable in every theme,
-  and the F key work"). Everything I did is committed and pushed to `origin/main`.
-- Live library: **73 books, 8 folders, 159 covers** on disk.
-- A `server/server.js` is running on port 8787 (started by me, hidden window).
-- Desktop build: `dist\Sailing-Books-Setup-1.0.0.exe`
-
-> ### ⚠ Uncommitted work in the tree that is NOT mine
-> `package.json` (version → 1.0.1), `README.md`, `renderer/renderer.js`,
-> `renderer/styles.css` and `web/login.html` have uncommitted edits that appeared
-> **during** my session and were made by someone else — a v1.0.1 visual refresh:
-> new tokens (`--font-ui`, `--font-display`, `--texture`, `--ease-ui`, `--control-radius`),
-> view-entrance animations (`enterView()`), `aria-pressed` on theme cards, and
-> `login.html` rewired onto the theme tokens. **Do not revert it.** My committed
-> state is the base it sits on top of.
+- Current app version: 1.0.4. Previous release installers are retained in their
+  versioned output folders.
+- Production web frontend: `https://sailingbooks.vercel.app`; its serverless
+  cloud API is in `api/cloud/[...route].js`.
+- Account, metadata, and private book files are owned by the configured Supabase
+  project. A standard account has a 1 GiB app quota; the configured Admin email
+  has no app-level quota. Supabase plan/storage limits still apply.
+- Desktop Local Library files are under `%APPDATA%\Sailing Books\Library`.
+  The hosted website Local Library uses IndexedDB in the current browser profile.
+- The optional laptop server agent polls cloud jobs and writes local copies into
+  that computer's library folder when it is running and paired.
+- Current work may be uncommitted while a release is being prepared. Check Git
+  status and the latest deployment before assuming a change is live.
 
 ---
 
@@ -144,7 +153,7 @@ reload. Settings now live under `sailing-books-settings`, per device.
 | Laptop data | `%APPDATA%\Sailing Books\` |
 | Books / covers / index | `Library\`, `Covers\`, `library-index.json` |
 | Progress from phone | `web-progress.json` |
-| Auth (shared secret) | `web-auth.json` — **password `589e8bb2`** |
+| Legacy laptop-server auth | `web-auth.json` (contains a local secret; do not copy it into docs or logs) |
 | Server port | 8787 (`SB_PORT` to change) |
 | Vercel front door | `https://sailingbooks.vercel.app` |
 | Funnel address | `https://sailing-books.tailcf4de9.ts.net` |
@@ -157,8 +166,9 @@ Commands: `npm start` · `npm run server` · `npm run tunnel` · `npm run funnel
 Env: `SB_PORT` `SB_PASSWORD` `SB_REQUIRE_PASSWORD` `SB_USER_DATA` `SB_PARENT_PID`
 `NGROK_AUTHTOKEN` `SB_NGROK_DOMAIN` `SB_FUNNEL_NAME`
 
-**Security note:** the password is 8 hex characters. Fine for a private library
-behind a tunnel; do not expose it. The user has been told twice and kept it.
+The hosted account flow uses Supabase Auth. Never put Supabase secret/service
+keys or local server credentials in client files, screenshots, commits, or
+handoff notes. Vercel cloud secrets belong in server-only environment settings.
 
 ---
 

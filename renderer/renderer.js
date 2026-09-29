@@ -32,11 +32,12 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 
 /* ---------- persistence ---------- */
 const WEB = !!(window.api && window.api.mode === 'web');   // phone / browser client
+const BROWSER_LOCAL = !!(WEB && window.api.isBrowserLocalLibrary?.());
 // The web client (server/server.js) reads library-index.json instead of
 // localStorage, so mirror the book list there — throttled, and never mid-drag.
 let indexSaveT = null;
 function publishIndex() {
-  if (WEB || indexSaveT) return;
+  if ((WEB && !BROWSER_LOCAL) || indexSaveT) return;
   indexSaveT = setTimeout(async () => {
     indexSaveT = null;
     if (ptrDrag) return;                       // wait until the drag settles
@@ -47,11 +48,11 @@ function publishIndex() {
         progress: state.books.map(b => ({ id: b.id, progress: b.progress, progressSeconds: b.progressSeconds, epubChapter: b.epubChapter, pdfPage: b.pdfPage, lastOpened: b.lastOpened }))
       });
     } catch {}
-  }, 2500);
+  }, BROWSER_LOCAL ? 150 : 2500);
 }
 const SETTINGS_KEY = 'sailing-books-settings';
 function save() {
-  if (WEB) { saveDeviceSettings(); saveRemoteProgress(); return; }
+  if (WEB) { saveDeviceSettings(); if (BROWSER_LOCAL) publishIndex(); else saveRemoteProgress(); return; }
   publishIndex();
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* quota - strip covers */ try { const slim = { ...state, books: state.books.map(b => ({ ...b, cover: '' })) }; localStorage.setItem(STORE_KEY, JSON.stringify(slim)); } catch {} }
 }
@@ -84,7 +85,7 @@ function saveRemoteProgress() {
 }
 // Folders, nodes, renames and imports belong to the desktop app.
 function desktopOnly() {
-  if (!WEB) return false;
+  if (!WEB || BROWSER_LOCAL) return false;
   toast('Manage your library in the desktop app');
   return true;
 }
@@ -97,6 +98,7 @@ async function hydrateFromServer() {
   return data;
 }
 function load() {
+  if (WEB && BROWSER_LOCAL) { loadDeviceSettings(); return; }
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) { loadDeviceSettings(); return; }
@@ -611,7 +613,7 @@ function makeGhost(text) {
 }
 function beginBookPointer(e, b) {
   if (e.button !== undefined && e.button > 0) return;
-  if (WEB) {
+  if (WEB && !BROWSER_LOCAL) {
     // No reordering on the phone, but a tap must still open the book — this is
     // the same object the pointer-up handler looks at to decide "it was a tap".
     ptrDrag = { kind: 'book', bookId: b.id, startX: e.clientX, startY: e.clientY, moved: false, ghost: null, pid: e.pointerId, tapOnly: true };
@@ -853,7 +855,7 @@ document.addEventListener('pointermove', onLassoMove);
 document.addEventListener('pointerup', onLassoUp);
 document.addEventListener('pointercancel', onLassoCancel);
 function showSelectionMenu(x, y) {
-  if (WEB) { showMenu(x, y, [{ label: 'Manage in the desktop app', action: desktopOnly }]); return; }
+  if (WEB && !BROWSER_LOCAL) { showMenu(x, y, [{ label: 'Manage in the desktop app', action: desktopOnly }]); return; }
   const fid = state.currentFolderId;
   const ids = chartSelection.filter(id => folderNodes(fid).some(n => n.id === id));
   if (!ids.length) { clearSelection(); return; }
@@ -957,7 +959,7 @@ function renderFlowchart() {
     if (!g) return;
     ev.preventDefault(); ev.stopPropagation();
     if (suppressCtxMenu) { suppressCtxMenu = false; return; }
-    showMenu(ev.clientX, ev.clientY, WEB
+    showMenu(ev.clientX, ev.clientY, WEB && !BROWSER_LOCAL
       ? [{ label: 'Manage in the desktop app', action: desktopOnly }]
       : [{ label: 'Delete this connection', danger: true, action: () => deleteEdge(fid, g.dataset.from, g.dataset.to) }]);
   });
@@ -1012,7 +1014,7 @@ function renderFlowchart() {
     node.oncontextmenu = (e) => {
       e.preventDefault(); e.stopPropagation();
       if (suppressCtxMenu) { suppressCtxMenu = false; return; }
-      if (WEB) { showMenu(e.clientX, e.clientY, [{ label: 'Manage in the desktop app', action: desktopOnly }]); return; }
+      if (WEB && !BROWSER_LOCAL) { showMenu(e.clientX, e.clientY, [{ label: 'Manage in the desktop app', action: desktopOnly }]); return; }
       if (chartSelection.length > 1 && chartSelection.includes(n.id)) { showSelectionMenu(e.clientX, e.clientY); return; }
       const inFolder = booksInFolder(fid);
       showMenu(e.clientX, e.clientY, [
@@ -1171,7 +1173,8 @@ async function deleteBook(b) {
 
 async function importPaths(paths, targetFolderId = null) {
   if (!paths || !paths.length) return;
-  const supported = paths.filter(p => typeOf(p));
+  const fileNameOf = item => typeof item === 'string' ? item : String(item && item.name || '');
+  const supported = paths.filter(p => typeOf(fileNameOf(p)));
   const skipped = paths.length - supported.length;
   if (!supported.length) { toast('No supported files (EPUB, MP3, M4A…)'); return; }
   toast(`Importing ${supported.length} file(s)…`);
@@ -1206,13 +1209,19 @@ window.addEventListener('sb-cloud-book-downloaded', async (event) => {
   const book = {
     id: uid(), title: String(saved.fileName).replace(/\.[^.]+$/, ''), author: '',
     type, fileName: saved.fileName, storedPath: saved.storedPath,
-    folderId: null, addedAt: Date.now(), cover: '', progress: 0
+    folderId: null, addedAt: Date.now(), cover: '', progress: 0,
+    ...(saved.cloudBookId ? { cloudBookId: saved.cloudBookId } : {})
   };
   state.books.unshift(book);
   save(); render();
   try { await enrichBook(book); } catch {}
   save(); render();
   toast('Added to Local Library');
+});
+window.addEventListener('sb-cloud-instance-created', async () => {
+  if (!WEB || BROWSER_LOCAL) return;
+  try { await hydrateFromServer(); render(); }
+  catch (error) { console.warn('Could not refresh the local library after the server copy completed', error); }
 });
 if (window.api?.onCloudInstanceAdded) {
   window.api.onCloudInstanceAdded((book) => window.dispatchEvent(new CustomEvent('sb-cloud-book-downloaded', { detail: book })));
@@ -1221,8 +1230,8 @@ if (window.api?.onCloudInstanceAdded) {
 async function pickAndImport() {
   if (desktopOnly()) return ;
   try {
-    const paths = await window.api.pickFiles();
-    if (paths && paths.length) importPaths(paths);
+    const items = await window.api.pickFiles();
+    if (items && items.length) importPaths(items);
   } catch (e) { toast('Could not open dialog'); }
 }
 
@@ -2580,7 +2589,7 @@ async function removeCoverFor(book) {
 }
 
 function folderMenuItems(f) {
-  if (WEB) return [{ label: 'Manage in the desktop app', action: desktopOnly }];
+  if (WEB && !BROWSER_LOCAL) return [{ label: 'Manage in the desktop app', action: desktopOnly }];
   return [
     { label: 'Open folder', action: () => { state.currentFolderId = f.id; render(); $('#libraryView').scrollTop = 0; } },
     { label: 'Rename', action: () => renameFolder(f) },
@@ -2590,7 +2599,7 @@ function folderMenuItems(f) {
   ];
 }
 function bookMenuItems(b) {
-  if (WEB) return [{ label: 'Open', action: () => openBook(b) }, { label: 'Manage in the desktop app', action: desktopOnly }];
+  if (WEB && !BROWSER_LOCAL) return [{ label: 'Open', action: () => openBook(b) }, { label: 'Manage in the desktop app', action: desktopOnly }];
   return [
     // The one icon the app keeps: the book you right-clicked.
     { icon: '📖', label: kindVerb(b.type), action: () => openBook(b) },
@@ -2742,8 +2751,9 @@ window.addEventListener('drop', async (e) => {
   $('#dropOverlay').classList.add('hidden');
   const files = [...(e.dataTransfer.files || [])];
   if (!files.length) return;
-  const paths = files.map(f => (window.api?.getPathForFile ? window.api.getPathForFile(f) : f.path)).filter(Boolean);
-  // If paths unavailable (browser mode), notify
+  const paths = BROWSER_LOCAL ? files : files.map(f => (window.api?.getPathForFile ? window.api.getPathForFile(f) : f.path)).filter(Boolean);
+  // A remote laptop browser cannot read a local file path; the hosted site can
+  // keep dropped files in its own browser-local library.
   if (!paths.length) { toast('Could not read dropped files in this mode'); return; }
   // If dropped onto a folder card, file it directly
   const folderEl = e.target.closest?.('[data-folder-id]');
@@ -2771,6 +2781,7 @@ $('#libraryView').addEventListener('contextmenu', (e) => {
 /* ---------- wiring ---------- */
 $('#btnEmptyAdd').onclick = pickAndImport;
 $('#btnEmptyFolder').onclick = createFolder;
+$('#btnLibraryAdd')?.addEventListener('click', pickAndImport);
 // The top bar is just the search field, so Home lives on the breadcrumb
 // ("‹ Library") and the reader's "← Library" button.
 $('#btnBack').onclick = closeReader;
@@ -2954,10 +2965,12 @@ function startApp() {
   pdfZoom = state.settings.pdfZoom;
   if (!state.settings.readMode) state.settings.readMode = 'scroll'; // 'scroll' | 'pages' (epub)
   render();
+  $('#btnLibraryAdd')?.classList.toggle('hidden', !BROWSER_LOCAL);
+  if (BROWSER_LOCAL) $('#libHint').textContent = 'Books added here stay in this browser on this device.';
   applyReaderStyle();
   syncSettingsUI();
   pdfReady().catch(() => {});
-  if (WEB) return;   // the laptop owns the library: no migrations, no adoption
+  if (WEB && !BROWSER_LOCAL) return;   // a connected laptop owns the remote library
   // Covers now live as files: migrate once, then auto-adopt anything new.
   (async () => {
     try { await migrateCoversToFiles(); } catch (e) { console.warn('cover migration', e); }

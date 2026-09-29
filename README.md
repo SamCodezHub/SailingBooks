@@ -32,13 +32,13 @@ npm install
 npm start
 ```
 
-## Build the v1.0.2 .exe
+## Build the v1.0.4 .exe
 ```powershell
 cd sailing-books
 npm install
-npm run dist -- --config.directories.output=release/1.0.2
+npm run dist -- --config.directories.output=release/1.0.4
 ```
-Output: `sailing-books\release\1.0.2\Sailing-Books-Setup-1.0.2.exe`. The 1.0.0 and 1.0.1 installers remain available in `dist`.
+Output: `sailing-books\release\1.0.4\Sailing-Books-Setup-1.0.4.exe`. Older installers remain available in their version folders.
 Install it, then launch **Sailing Books** from the Start Menu or desktop shortcut.
 Your library files are copied to `%APPDATA%\Sailing Books\Library`.
 
@@ -49,6 +49,15 @@ npm run build:web
 The static site is written to `web\dist`. It uses the same renderer and styles as the desktop app. The Vercel project also serves its cloud-account API from the root `api` folder.
 
 Before enabling sign-up, uploads, or server pairing, follow [`supabase/README.md`](supabase/README.md) to run the database migration and configure Vercel. The service-role key and Admin email are server-only settings.
+
+## Where books are stored
+
+- **Online Library:** Book files are stored in the private `sailing-books` bucket in your configured Supabase Storage project. Account records and book metadata are in Supabase Auth/Postgres. Vercel's cloud API checks ownership and enforces the app quota: 1 GiB for standard accounts; the Admin account has no app-level quota. Supabase project/plan limits still apply.
+- **Desktop Local Library:** Files are on that Windows computer in `%APPDATA%\Sailing Books\Library`; the library index and covers are alongside it under `%APPDATA%\Sailing Books\`.
+- **Vercel website Local Library:** Files are stored in that browser profile's IndexedDB for `sailingbooks.vercel.app`. This is device/browser-local, separate from Supabase and other devices; clearing site data can remove it. Use Download to save a regular file to the browser's Downloads folder.
+- **Create local copy:** The selected active server downloads the private online file into that server's own `Library` folder. On the Vercel website, the same action also adds a browser-local copy to the website's Local Library.
+
+Online storage is billed/limited by the Supabase project owner; Sailing Books does not provide a separate storage pool.
 
 ## Notes
 - EPUB parsing is fully offline (JSZip, no server).

@@ -166,6 +166,24 @@
     }
     return data;
   }
+  async function apiFile(path, retry = true) {
+    const token = await accessToken();
+    let response;
+    try { response = await fetch(apiBase() + path, { headers: { Authorization: 'Bearer ' + token } }); }
+    catch { throw new Error('Could not reach the Sailing Books cloud service. Check your connection and try again.'); }
+    if (response.status === 401 && retry && session?.refresh_token) { await refreshToken(); return apiFile(path, false); }
+    if (response.status === 401) {
+      await expireSession();
+      throw new Error('Your sign-in expired. Your books are safe; sign in again to continue.');
+    }
+    if (!response.ok) {
+      const data = await response.clone().json().catch(() => ({}));
+      let route = apiBase() + path;
+      try { route = new URL(route, location.href).pathname; } catch {}
+      throw new Error(data.error || `Cloud request failed (${response.status}) at ${route}.`);
+    }
+    return response;
+  }
   function ext(name) { return String(name || '').split('.').pop().toLowerCase(); }
   function typeFor(name) { const e = ext(name); return e === 'epub' ? 'epub' : e === 'pdf' ? 'pdf' : ['mp3','m4a','m4b','wav','ogg','opus','flac','aac'].includes(e) ? 'audio' : ''; }
   function mimeFor(name) {
@@ -246,7 +264,33 @@
         makeCopy.disabled = true;
         const targetServer = $('#targetServerSelect').value;
         if (!targetServer) { makeCopy.disabled = false; setMessage('#cloudUploadStatus', 'Choose an active server first.', 'bad'); return; }
-        try { await api(`/servers/${enc(targetServer)}/instances`, { method: 'POST', body: JSON.stringify({ bookId: book.id }) }); setMessage('#cloudUploadStatus', `“${book.title || book.file_name}” is queued for a local copy.`, 'good'); }
+        const server = servers.find(item => item.id === targetServer);
+        try {
+          const result = await api(`/servers/${enc(targetServer)}/instances`, { method: 'POST', body: JSON.stringify({ bookId: book.id }) });
+          const jobId = result.job?.id;
+          if (!jobId) throw new Error('The server did not accept the local-copy request.');
+          let browserCopyError = '';
+          if (window.api?.isBrowserLocalLibrary?.()) {
+            try { await addOnlineBookToBrowser(book); }
+            catch (error) { browserCopyError = error.message || 'Could not add the book to this browser.'; }
+          }
+          setMessage('#cloudUploadStatus', `Creating a local copy on ${server?.name || 'the selected server'}…`);
+          const job = await waitForInstance(targetServer, jobId);
+          if (job?.status === 'complete') {
+            window.dispatchEvent(new CustomEvent('sb-cloud-instance-created', { detail: { serverId: targetServer, jobId } }));
+            const local = window.api?.isBrowserLocalLibrary?.();
+            const message = local
+              ? browserCopyError ? `The server copy was created, but this browser could not add it to Local Library: ${browserCopyError}` : `“${book.title || book.file_name}” is now in this browser’s Local Library and on ${server?.name || 'the selected server'}.`
+              : `“${book.title || book.file_name}” was added to ${server?.name || 'the selected server'}’s Local Library.`;
+            setMessage('#cloudUploadStatus', message, browserCopyError ? 'bad' : 'good');
+          } else if (job?.status === 'failed') {
+            const local = window.api?.isBrowserLocalLibrary?.();
+            const prefix = local && !browserCopyError ? 'It was added to this browser’s Local Library. ' : '';
+            setMessage('#cloudUploadStatus', `${prefix}The server could not create its local copy: ${job.result_message || 'please check that computer and retry.'}`, 'bad');
+          } else {
+            setMessage('#cloudUploadStatus', `The local-copy request is still queued on ${server?.name || 'the selected server'}. Keep it running and refresh the library shortly.`, 'good');
+          }
+        }
         catch (error) { setMessage('#cloudUploadStatus', error.message, 'bad'); }
         finally { makeCopy.disabled = false; }
       };
@@ -331,21 +375,39 @@
     setMessage('#cloudUploadStatus', `${items.length} book${items.length === 1 ? '' : 's'} added to your online library.`, 'good');
     await refreshOnline();
   }
+  async function addOnlineBookToBrowser(book) {
+    const response = await apiFile(`/books/${enc(book.id)}/file`);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const saved = await window.api.saveCloudBook(book.file_name, bytes, book.id);
+    if (saved?.alreadyAdded) return saved;
+    if (!saved?.storedPath) throw new Error(saved?.error || 'Could not add the book to this browser’s Local Library.');
+    window.dispatchEvent(new CustomEvent('sb-cloud-book-downloaded', { detail: saved }));
+    return saved;
+  }
+  async function waitForInstance(serverId, jobId) {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const result = await api(`/servers/${enc(serverId)}/instances/${enc(jobId)}`);
+      if (result.job?.status === 'complete' || result.job?.status === 'failed') return result.job;
+    }
+    return null;
+  }
   async function downloadBook(book) {
     try {
-      const { url } = await api(`/books/${enc(book.id)}/download`);
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Could not download this book.');
+      const response = await apiFile(`/books/${enc(book.id)}/file`);
       const bytes = new Uint8Array(await response.arrayBuffer());
-      if (window.api?.saveCloudBook) {
+      if (!window.api?.mode && window.api?.saveCloudBook) {
         const saved = await window.api.saveCloudBook(book.file_name, bytes);
         if (!saved?.storedPath) throw new Error(saved?.error || 'Could not save the book to this computer.');
         window.dispatchEvent(new CustomEvent('sb-cloud-book-downloaded', { detail: saved }));
         setMessage('#cloudUploadStatus', `“${book.title || book.file_name}” is now in Local Library.`, 'good');
       } else {
         const blob = new Blob([bytes], { type: mimeFor(book.file_name) });
-        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = book.file_name; link.click();
-        setTimeout(() => URL.revokeObjectURL(link.href), 30000);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a'); link.href = url; link.download = book.file_name; link.style.display = 'none';
+        document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        setMessage('#cloudUploadStatus', `Download started for “${book.title || book.file_name}”.`, 'good');
       }
     } catch (error) { setMessage('#cloudUploadStatus', error.message, 'bad'); }
   }

@@ -1,4 +1,8 @@
-# Sailing Books — phone / web access
+# Sailing Books — laptop server access
+
+This guide describes the optional laptop-backed browser mode. The current Vercel
+account app also has a private Online Library and a browser-local Local Library;
+see [Where books are stored](README.md#where-books-are-stored) for how those differ.
 
 The library stays on your laptop. Your phone signs in with a password and reads
 the books over your home Wi-Fi — nothing is uploaded anywhere.
