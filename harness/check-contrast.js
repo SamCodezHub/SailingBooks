@@ -43,6 +43,14 @@ app.whenReady().then(async () => {
     if (back) { back.click(); await sleep(800); }
     const folder = document.querySelector('.folder-card');
     if (folder) { folder.click(); await sleep(1500); }
+    // The interface crossfades between themes. Measuring colour while that is in
+    // flight pairs one theme's text with another theme's background, which reads
+    // as unreadable and is not. Animations off, so the measurement is of colours
+    // rather than of timing.
+    const kill = document.createElement('style');
+    kill.textContent = '*,*::before,*::after{transition:none !important;animation:none !important}';
+    document.head.appendChild(kill);
+    await sleep(120);
 
     // WCAG relative luminance + contrast ratio
     const parse = (c) => {
@@ -98,13 +106,12 @@ app.whenReady().then(async () => {
     const out = [];
     const names = ['Light','Paper','Solar','Mono','Midnight','Dusk','Ocean','Forest','Ink'];
     for (const name of names) {
-      document.getElementById('btnSettings').click();
-      await sleep(120);
-      const card = [...document.querySelectorAll('.theme-card')].find(c => c.textContent.includes(name));
-      if (card) card.click();
-      await sleep(150);
-      document.getElementById('settingsPanel').classList.add('hidden');
-      await sleep(80);
+      // switch by attribute rather than by clicking a card: one source of truth,
+      // no dependence on the picker's own re-render
+      const id = name.toLowerCase();
+      document.documentElement.setAttribute('data-theme', id);
+      document.getElementById('settingsPanel') && document.getElementById('settingsPanel').classList.add('hidden');
+      await sleep(180);
 
       const rows = [];
       for (const [label, sel] of TARGETS) {

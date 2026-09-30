@@ -1061,9 +1061,8 @@ function positionNodes(fid) {
   });
 }
 
-// Edge geometry is read and painted once per animation frame. Keeping the SVG
-// paths in place prevents them flickering while a node is dragged; DOMRects
-// retain fractional CSS pixels, unlike offsetLeft/Top which snap line ends.
+// Edge geometry is painted once per animation frame. Keeping the SVG paths in
+// place stops them flickering while a node is dragged.
 function layoutEdges() {
   if (edgeLayoutRaf) return;
   edgeLayoutRaf = requestAnimationFrame(() => {
@@ -1095,14 +1094,20 @@ function drawFlowEdges() {
   if (!fid) return;
   const d = chartDims();
   const edges = folderEdges(fid);
-  const innerRect = inner.getBoundingClientRect();
+  // Node boxes are derived from the same fracToPos maths that positionNodes uses
+  // to place them, and from offsetWidth/offsetHeight, which are layout values.
+  // Measuring getBoundingClientRect() instead looks equivalent but is not: an
+  // ancestor transform (the view entrance animation scales the whole library)
+  // skews those rects, so edges were painted to where nodes appeared mid
+  // animation and never repainted - lines floating free of their nodes.
+  const nodes = folderNodes(fid);
   const boxes = new Map();
   host.querySelectorAll('.flow-node').forEach(el => {
-    const r = el.getBoundingClientRect();
-    boxes.set(el.dataset.nodeId, {
-      x: r.left - innerRect.left, y: r.top - innerRect.top,
-      w: r.width || NODE_W, h: r.height || NODE_H
-    });
+    const n = nodes.find(x => x.id === el.dataset.nodeId);
+    if (!n) return;
+    const size = nodeSize(el);
+    const pos = fracToPos(n.fx, n.fy, d, size);
+    boxes.set(n.id, { x: pos.x, y: pos.y, w: size.w, h: size.h });
   });
   if (svg.getAttribute('width') !== String(d.W)) svg.setAttribute('width', d.W);
   if (svg.getAttribute('height') !== String(d.H)) svg.setAttribute('height', d.H);
@@ -2183,7 +2188,16 @@ function enterView(view) {
   // Restart the short entrance animation when returning to an existing view.
   void view.offsetWidth;
   view.classList.add('view-enter');
-  view.addEventListener('animationend', () => view.classList.remove('view-enter'), { once: true });
+  view.addEventListener('animationend', () => {
+    view.classList.remove('view-enter');
+    // The animation scales this view, which moves everything inside it. Whatever
+    // was measured while it ran is now stale, so repaint the chart once it has
+    // settled. Belt and braces: edges no longer depend on measurement, but a
+    // resize or zoom during the animation would otherwise be lost.
+    if (view.id === 'libraryView' && state.currentFolderId && !$('#orderSection').classList.contains('hidden')) {
+      layoutEdges();
+    }
+  }, { once: true });
 }
 
 function buildThemeGrid() {
