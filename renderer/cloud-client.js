@@ -421,7 +421,11 @@
   }
   async function registerServer(event) {
     event.preventDefault();
-    const button = event.currentTarget.querySelector('button[type="submit"]'); button.disabled = true;
+    // currentTarget is only set while the event listener is running. Keep the
+    // form reference before the async requests below so it remains available
+    // after they finish.
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]'); button.disabled = true;
     const box = $('#serverPairing'); box.classList.remove('hidden'); box.textContent = 'Registering server…';
     try {
       const result = await api('/servers/register', { method: 'POST', body: JSON.stringify({ name: $('#serverName').value.trim(), baseUrl: $('#serverUrl').value.trim() }) });
@@ -435,7 +439,7 @@
       box.innerHTML = `<strong>${esc(msg)}</strong><p>${esc(result.server.name)} · ${esc(result.server.base_url)}</p><code>${esc(result.pairingToken)}</code><button type="button" class="btn small ghost" id="copyServerToken">Copy token</button><p>On a separate server, set SB_CLOUD_SERVER_ID to <code>${esc(result.server.id)}</code> and SB_CLOUD_SERVER_TOKEN to the token, then restart Sailing Books Server.</p>`;
       $('#copyServerToken').onclick = async () => { await navigator.clipboard?.writeText(result.pairingToken); $('#copyServerToken').textContent = 'Copied'; };
       await renderServers();
-      event.currentTarget.reset();
+      form.reset();
     } catch (error) { box.textContent = error.message; }
     finally { button.disabled = false; }
   }
