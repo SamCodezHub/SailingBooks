@@ -362,6 +362,26 @@
       throw error;
     }
   }
+
+  /* A small, deliberate bridge for the rest of the app.
+   *
+   * The book right-click menu offers "Move to online library", which has no way
+   * to reach uploadOne() on its own: this file is a closure and exposes nothing.
+   * Rather than publish the internals, only these three things are handed over -
+   * whether there is a usable session, uploading one file that already exists on
+   * disk, and the list of books already online so a repeat can be recognised. */
+  window.sbOnlineLibrary = {
+    signedIn: () => !!session?.refresh_token,
+    onlineBooks: () => books.map(b => ({ id: b.id, fileName: b.file_name })),
+    async uploadLocalFile(filePath, fileName) {
+      if (!session?.refresh_token) throw new Error('Sign in to your online library first.');
+      await uploadOne({ path: filePath, name: fileName });
+      // Keep the tab's own list in step, so switching to it shows the new book
+      await refreshOnline().catch(() => {});
+      return true;
+    }
+  };
+
   async function handleUpload(event) {
     const input = event.currentTarget;
     let items = Array.from(input.files || []);

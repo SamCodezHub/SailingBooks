@@ -2611,6 +2611,55 @@ function folderMenuItems(f) {
     { label: 'Delete folder', danger: true, action: () => deleteFolder(f) },
   ];
 }
+/* ---------- online library ---------- */
+/* Uploading a local book to the online library is the same reserve -> storage
+   upload -> complete sequence the Online Library tab uses for files picked from
+   disk, reached through the small bridge the cloud client publishes. Nothing is
+   deleted here: the local file stays until the book owner says otherwise, so a
+   failed or half-finished upload can never cost them the book. */
+function onlineBridge() {
+  return (typeof window !== 'undefined' && window.sbOnlineLibrary) ? window.sbOnlineLibrary : null;
+}
+function alreadyOnline(b) {
+  const bridge = onlineBridge();
+  if (!bridge || !b.fileName) return false;
+  try { return bridge.onlineBooks().some(x => x.fileName === b.fileName); } catch { return false; }
+}
+function onlineMoveItems(b) {
+  const bridge = onlineBridge();
+  // Only offered where an upload can actually happen: a book whose bytes are on
+  // this computer (never an id: placeholder from the server), with the online
+  // library present, and not one that is there already.
+  const path = String(b.storedPath || '');
+  if (!bridge || !path || WEB || path.startsWith('id:') || alreadyOnline(b)) return [];
+  return [
+    { sep: true },
+    {
+      label: 'Move to online library',
+      action: async () => {
+        if (!bridge.signedIn()) { toast('Sign in to your online library first'); return; }
+        const size = isFinite(b.fileSize) ? b.fileSize : 0;
+        // Uploads are held in memory on the way out, so a huge audiobook is
+        // worth a warning rather than a surprise failure halfway through.
+        const heavy = size > 400 * 1024 * 1024;
+        if (heavy && !confirm(`"${b.title}" is ${Math.round(size / 1048576)} MB.\n\nUploading a book this large can take a long time and needs the app open until it finishes. Continue?`)) return;
+        toast(`Uploading "${b.title}"`);
+        try {
+          await bridge.uploadLocalFile(b.storedPath, b.fileName);
+          toast(`"${b.title}" is now in your online library`);
+        } catch (e) {
+          toast('Upload failed: ' + (e && e.message ? e.message : e));
+          return;
+        }
+        // The name says move, so offer the rest of it - but only as a question,
+        // and the book has to survive the upload first.
+        if (!confirm(`"${b.title}" is in your online library.\n\nDelete the local copy from this computer?`)) return;
+        deleteBook(b);
+      }
+    }
+  ];
+}
+
 function bookMenuItems(b) {
   if (WEB && !BROWSER_LOCAL) return [{ label: 'Open', action: () => openBook(b) }, { label: 'Manage in the desktop app', action: desktopOnly }];
   return [
@@ -2636,6 +2685,7 @@ function bookMenuItems(b) {
         }
         render();
       } }] : []),
+    ...(onlineMoveItems(b)),
     { label: 'Delete', danger: true, action: () => deleteBook(b) },
   ];
 }
