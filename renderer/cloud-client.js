@@ -14,6 +14,48 @@
   let refreshPromise = null;
   const hostedLanding = !!(window.api && window.api.mode === 'web' && !window.SB_SERVED_BY_LAPTOP);
 
+  /* The four ways to hold a library. Storage and simultaneous readers are what
+     the plans actually differ by; the tick list is what each one includes.
+     No prices: what a plan costs is decided with the person, not published here.
+     storage is also the copy the sign-up screen shows, so the wording is not
+     duplicated anywhere else. */
+  const PLANS = [
+    {
+      id: 'free', name: 'Free', tagline: 'A private shelf, just for you',
+      storage: '1 GB of cloud storage', seats: '1 person signed in at a time',
+      signupLine: 'Start with 1 GB of private online book storage.',
+      features: ['Every book format: EPUB, PDF, audiobook', 'Read on your desktop and phone',
+        'Books stay on this computer too', 'Private by default']
+    },
+    {
+      id: 'plus', name: 'Plus', tagline: 'Room to grow', recommended: true,
+      storage: '10 GB of cloud storage', seats: '2 people signed in at a time',
+      signupLine: 'Start with 10 GB of private online book storage.',
+      features: ['Everything in Free', 'Share books with one other person',
+        'Send books to your own computers', 'Room for a series and its audiobooks']
+    },
+    {
+      id: 'pro', name: 'Pro', tagline: 'A library for a few',
+      storage: '100 GB of cloud storage', seats: '4 people signed in at a time',
+      signupLine: 'Start with 100 GB of private online book storage.',
+      features: ['Everything in Plus', 'Share with a household or a small team',
+        'Priority when adding new computers', 'Room for large audio libraries']
+    },
+    {
+      id: 'library', name: 'Library', tagline: 'For institutions and big shelves',
+      storage: 'Charged per GB you use', seats: '200+ readers, each with their own sign-in',
+      signupLine: 'Storage is charged per GB you use.',
+      features: ['Everything in Pro', 'A separate sign-in for every reader',
+        'Central management for the whole shelf', 'Best for schools, clubs and libraries']
+    }
+  ];
+  const PLAN_IDS = PLANS.map(p => p.id);
+  const planById = (id) => PLANS.find(p => p.id === id) || null;
+  const PLAN_KEY = 'sb-cloud-plan-v1';
+  const ACCOUNT_PLAN_KEY = 'sb-cloud-account-plan-v1';
+  let chosenPlan = 'free';
+  const chosenPlanInfo = () => planById(chosenPlan);
+
   function apiBase() {
     // Keep hosted builds on their own origin, including Vercel preview/custom
     // domains. That avoids cross-origin preflights for the account API. A page
@@ -201,19 +243,106 @@
   function esc(value) { return String(value || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function updateAccountButton() {
     const btn = $('#btnAccount');
-    if (btn) btn.textContent = account?.user?.email ? account.user.email.split('@')[0] : 'Sign in';
-    $('#cloudIdentity').textContent = account?.user?.email || '';
+    const email = account?.user?.email || '';
+    if (btn) btn.textContent = email ? email.split('@')[0] : 'Sign in';
+    $('#cloudIdentity').textContent = email || '';
+    const plan = planById(accountPlanId());
+    // Say which plan this account is on, next to the name that identifies it.
+    const identity = $('#cloudIdentity');
+    if (identity && plan) {
+      identity.textContent = email;
+      identity.title = plan.name + ' · ' + plan.storage + ' · ' + plan.seats;
+    }
     $('#libraryNav')?.classList.toggle('hidden', hostedLanding && !session);
   }
   function showAuthMode(signup) {
     isSignup = !!signup;
     $('#cloudAuthEyebrow').textContent = isSignup ? 'MAKE IT YOURS' : 'WELCOME BACK';
     $('#cloudAuthTitle').textContent = isSignup ? 'Create your account' : 'Sign in to your library';
-    $('#cloudAuthSub').textContent = isSignup ? 'Start with 1 GB of private online book storage.' : 'Your local books stay on this computer.';
+    const plan = chosenPlanInfo();
+    // On sign-up the line describes the plan just chosen. On sign-in the plan
+    // already belongs to the account, so the line stays the reassuring one.
+    $('#cloudAuthSub').textContent = isSignup && plan ? plan.signupLine
+      : 'Your local books stay on this computer.';
     $('#cloudPassword').autocomplete = isSignup ? 'new-password' : 'current-password';
     $('#cloudAuthSubmit').textContent = isSignup ? 'Create account' : 'Sign in';
     $('#cloudAuthToggle').textContent = isSignup ? 'Already have an account? Sign in' : 'New here? Create an account';
     setMessage('#cloudAuthError', '');
+    renderPlanSelection();
+  }
+
+  /* ---- plan chooser ---- */
+  function renderPlanGrid() {
+    const grid = $('#planGrid');
+    if (!grid) return;
+    grid.replaceChildren();
+    for (const plan of PLANS) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'plan-card';
+      card.setAttribute('role', 'radio');
+      card.dataset.planId = plan.id;
+      card.setAttribute('aria-checked', String(plan.id === chosenPlan));
+      card.innerHTML =
+        (plan.recommended ? '<span class="plan-pill">Recommended</span>' : '') +
+        `<span class="plan-name">${esc(plan.name)}</span>` +
+        `<span class="plan-tagline">${esc(plan.tagline)}</span>` +
+        `<span class="plan-spec">${esc(plan.storage)}</span>` +
+        `<span class="plan-seats">${esc(plan.seats)}</span>` +
+        '<span class="plan-rule"></span>' +
+        '<ul class="plan-features">' +
+          plan.features.map(f => `<li>${esc(f)}</li>`).join('') +
+        '</ul>';
+      card.onclick = () => { choosePlan(plan.id); };
+      grid.appendChild(card);
+    }
+    renderPlanSelection();
+  }
+  // Marks the chosen card and tells the sign-up panel about it, without
+  // rebuilding the grid: rebuilding would drop keyboard focus mid-interaction.
+  function renderPlanSelection() {
+    const grid = $('#planGrid');
+    if (grid) {
+      for (const card of grid.querySelectorAll('.plan-card')) {
+        card.setAttribute('aria-checked', String(card.dataset.planId === chosenPlan));
+      }
+    }
+    const line = $('#cloudPlanLine');
+    const plan = chosenPlanInfo();
+    if (!line) return;
+    // Signing in to an existing account: the plan is already theirs, so the
+    // line stays out of the way rather than implying it will change.
+    if (!isSignup || !plan) { line.classList.add('hidden'); line.textContent = ''; return; }
+    line.classList.remove('hidden');
+    line.innerHTML = `New accounts start on <b>${esc(plan.name)}</b> · ${esc(plan.storage)} · ${esc(plan.seats)}`;
+  }
+  function choosePlan(id) {
+    if (!PLAN_IDS.includes(id)) return;
+    chosenPlan = id;
+    try { localStorage.setItem(PLAN_KEY, id); } catch {}
+    renderPlanSelection();
+    if (isSignup) showAuthMode(true);
+  }
+  function restoreChosenPlan() {
+    try {
+      const saved = localStorage.getItem(PLAN_KEY);
+      if (saved && PLAN_IDS.includes(saved)) chosenPlan = saved;
+    } catch {}
+  }
+  // Remembers which plan an account was created on, so the signed-in view can
+  // say so. The server may report one too; that always wins.
+  function accountPlanId() {
+    if (account && account.plan && PLAN_IDS.includes(account.plan)) return account.plan;
+    const email = (account && account.user && account.user.email) || (session && session.email) || '';
+    if (!email) return null;
+    try {
+      const saved = JSON.parse(localStorage.getItem(ACCOUNT_PLAN_KEY) || 'null');
+      return saved && saved.email === email && PLAN_IDS.includes(saved.plan) ? saved.plan : null;
+    } catch { return null; }
+  }
+  function rememberAccountPlan(email, planId) {
+    if (!email || !PLAN_IDS.includes(planId)) return;
+    try { localStorage.setItem(ACCOUNT_PLAN_KEY, JSON.stringify({ email, plan: planId })); } catch {}
   }
   async function submitAuth(event) {
     event.preventDefault();
@@ -222,14 +351,20 @@
     submit.disabled = true;
     setMessage('#cloudAuthError', 'Connecting…');
     try {
-      const data = isSignup
-        ? await authCall('signup', { email, password })
+const data = isSignup
+      // The chosen plan rides along in the account's metadata, which Supabase
+      // stores for us. No schema change needed here, and the server can read it
+      // when it sets the quota and the simultaneous-reader limit.
+      ? await authCall('signup', { email, password, options: { data: { plan: chosenPlan } } })
         : await authCall('token?grant_type=password', { email, password });
       if (!data.access_token) {
         setMessage('#cloudAuthError', 'Check your email to confirm the account, then sign in.', 'good');
         return;
       }
       await sessionSave({ ...data, expires_at: Date.now() + Number(data.expires_in || 3600) * 1000 });
+      // Sign-up is the only moment the plan is chosen, so this is where it is
+      // recorded against the account for the signed-in view.
+      if (isSignup) rememberAccountPlan(email, chosenPlan);
       $('#cloudPassword').value = '';
       await refreshOnline();
       updateAccountButton();
@@ -471,7 +606,17 @@
   }
   async function init() {
     if (!$('#cloudLanding')) return;
-    session = await sessionRead();
+    // The plan chooser is drawn before the session is read, not after: reading a
+    // session can fail or be slow, and the sign-in page must still show its
+    // plans when it does.
+    restoreChosenPlan();
+    renderPlanGrid();
+    // Reading the stored session must never be able to take the page down with
+    // it. It goes through the desktop bridge, so it can fail if that is missing
+    // or the file is unreadable, and an await that rejects here would stop every
+    // line below from running - leaving a sign-in form that renders but does
+    // nothing when pressed. A failed read just means "not signed in".
+    session = await sessionRead().catch(() => null);
     $('#navLocalLibrary').onclick = () => setPage('local');
     $('#navOnlineLibrary').onclick = () => { if (session) setPage('online'); else setPage('landing'); };
     $('#btnAccount').onclick = () => { setPage(session ? 'online' : 'landing'); if (!session) showAuthMode(false); };

@@ -138,8 +138,17 @@
       <p>Keep a private online shelf, read on your own devices, and send books to a computer you trust.</p>
       <div class="landing-notes"><span>Private by default</span><span>1 GB free library</span><span>Works with your desktop shelf</span></div>
     </section>
+    <section class="plan-chooser" aria-label="Choose a plan">
+      <div class="plan-chooser-head">
+        <span class="eyebrow">CHOOSE YOUR SHELF</span>
+        <h2>Four ways to keep a library</h2>
+        <p>How much room you need, and how many people can read at the same time. Change your mind whenever you like.</p>
+      </div>
+      <div id="planGrid" class="plan-grid" role="radiogroup" aria-label="Plans"></div>
+    </section>
     <section class="cloud-auth-card" aria-label="Account sign in">
       <div class="auth-heading"><span class="eyebrow" id="cloudAuthEyebrow">WELCOME BACK</span><h2 id="cloudAuthTitle">Sign in to your library</h2><p id="cloudAuthSub">Your local books stay on this computer.</p></div>
+      <p id="cloudPlanLine" class="auth-plan hidden"></p>
       <form id="cloudAuthForm">
         <label class="cloud-field"><span>Email</span><input id="cloudEmail" type="email" autocomplete="email" required placeholder="you@example.com"/></label>
         <label class="cloud-field"><span>Password</span><input id="cloudPassword" type="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters"/></label>
