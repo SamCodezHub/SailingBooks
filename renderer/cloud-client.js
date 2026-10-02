@@ -15,34 +15,35 @@
   const hostedLanding = !!(window.api && window.api.mode === 'web' && !window.SB_SERVED_BY_LAPTOP);
 
   /* The four ways to hold a library. Storage and simultaneous readers are what
-     the plans actually differ by; the tick list is what each one includes.
-     No prices: what a plan costs is decided with the person, not published here.
-     storage is also the copy the sign-up screen shows, so the wording is not
-     duplicated anywhere else. */
+     the plans differ by; the tick list is what each includes. No prices: what a
+     plan costs is agreed with the person, not published here.
+     Only Free is open today. The other three are shown so the shape of the
+     service is visible, and are marked unavailable rather than hidden - quietly
+     dropping them would leave someone wondering whether they missed something. */
   const PLANS = [
     {
-      id: 'free', name: 'Free', tagline: 'A private shelf, just for you',
+      id: 'free', name: 'Free', tagline: 'A private shelf, just for you', available: true,
       storage: '1 GB of cloud storage', seats: '1 person signed in at a time',
       signupLine: 'Start with 1 GB of private online book storage.',
       features: ['Every book format: EPUB, PDF, audiobook', 'Read on your desktop and phone',
         'Books stay on this computer too', 'Private by default']
     },
     {
-      id: 'plus', name: 'Plus', tagline: 'Room to grow', recommended: true,
+      id: 'plus', name: 'Plus', tagline: 'Room to grow', available: false,
       storage: '10 GB of cloud storage', seats: '2 people signed in at a time',
       signupLine: 'Start with 10 GB of private online book storage.',
       features: ['Everything in Free', 'Share books with one other person',
         'Send books to your own computers', 'Room for a series and its audiobooks']
     },
     {
-      id: 'pro', name: 'Pro', tagline: 'A library for a few',
+      id: 'pro', name: 'Pro', tagline: 'A library for a few', available: false,
       storage: '100 GB of cloud storage', seats: '4 people signed in at a time',
       signupLine: 'Start with 100 GB of private online book storage.',
       features: ['Everything in Plus', 'Share with a household or a small team',
         'Priority when adding new computers', 'Room for large audio libraries']
     },
     {
-      id: 'library', name: 'Library', tagline: 'For institutions and big shelves',
+      id: 'library', name: 'Library', tagline: 'For institutions and big shelves', available: false,
       storage: 'Charged per GB you use', seats: '200+ readers, each with their own sign-in',
       signupLine: 'Storage is charged per GB you use.',
       features: ['Everything in Pro', 'A separate sign-in for every reader',
@@ -51,6 +52,7 @@
   ];
   const PLAN_IDS = PLANS.map(p => p.id);
   const planById = (id) => PLANS.find(p => p.id === id) || null;
+  const planAvailable = (id) => !!(planById(id) && planById(id).available);
   const PLAN_KEY = 'sb-cloud-plan-v1';
   const ACCOUNT_PLAN_KEY = 'sb-cloud-account-plan-v1';
   let chosenPlan = 'free';
@@ -268,6 +270,9 @@
     $('#cloudAuthSubmit').textContent = isSignup ? 'Create account' : 'Sign in';
     $('#cloudAuthToggle').textContent = isSignup ? 'Already have an account? Sign in' : 'New here? Create an account';
     setMessage('#cloudAuthError', '');
+    // The plan is chosen as part of creating an account, so the chooser belongs
+    // to that step and stays out of the way when signing back in.
+    $('#planChooser')?.classList.toggle('hidden', !isSignup);
     renderPlanSelection();
   }
 
@@ -282,9 +287,11 @@
       card.className = 'plan-card';
       card.setAttribute('role', 'radio');
       card.dataset.planId = plan.id;
-      card.setAttribute('aria-checked', String(plan.id === chosenPlan));
+      if (plan.available) card.setAttribute('aria-checked', String(plan.id === chosenPlan));
+      else card.setAttribute('aria-disabled', 'true');
+      const pill = plan.available ? '' : '<span class="plan-pill soon">Unavailable for now</span>';
       card.innerHTML =
-        (plan.recommended ? '<span class="plan-pill">Recommended</span>' : '') +
+        pill +
         `<span class="plan-name">${esc(plan.name)}</span>` +
         `<span class="plan-tagline">${esc(plan.tagline)}</span>` +
         `<span class="plan-spec">${esc(plan.storage)}</span>` +
@@ -293,7 +300,12 @@
         '<ul class="plan-features">' +
           plan.features.map(f => `<li>${esc(f)}</li>`).join('') +
         '</ul>';
-      card.onclick = () => { choosePlan(plan.id); };
+      card.onclick = () => {
+        // A plan that is not open cannot be chosen, and says so rather than
+        // doing nothing at all.
+        if (!plan.available) { setMessage('#cloudAuthError', `${plan.name} is not available yet. Free is open today.`); return; }
+        choosePlan(plan.id);
+      };
       grid.appendChild(card);
     }
     renderPlanSelection();
@@ -304,6 +316,7 @@
     const grid = $('#planGrid');
     if (grid) {
       for (const card of grid.querySelectorAll('.plan-card')) {
+        if (card.getAttribute('aria-disabled') === 'true') continue;
         card.setAttribute('aria-checked', String(card.dataset.planId === chosenPlan));
       }
     }
@@ -317,7 +330,7 @@
     line.innerHTML = `New accounts start on <b>${esc(plan.name)}</b> · ${esc(plan.storage)} · ${esc(plan.seats)}`;
   }
   function choosePlan(id) {
-    if (!PLAN_IDS.includes(id)) return;
+    if (!PLAN_IDS.includes(id) || !planAvailable(id)) return;
     chosenPlan = id;
     try { localStorage.setItem(PLAN_KEY, id); } catch {}
     renderPlanSelection();
@@ -326,7 +339,10 @@
   function restoreChosenPlan() {
     try {
       const saved = localStorage.getItem(PLAN_KEY);
-      if (saved && PLAN_IDS.includes(saved)) chosenPlan = saved;
+      if (saved && planAvailable(saved)) { chosenPlan = saved; return; }
+      // A remembered choice that is no longer open must not linger: drop it, so
+      // nothing downstream can read a plan that cannot be had.
+      if (saved) localStorage.removeItem(PLAN_KEY);
     } catch {}
   }
   // Remembers which plan an account was created on, so the signed-in view can
@@ -355,7 +371,10 @@ const data = isSignup
       // The chosen plan rides along in the account's metadata, which Supabase
       // stores for us. No schema change needed here, and the server can read it
       // when it sets the quota and the simultaneous-reader limit.
-      ? await authCall('signup', { email, password, options: { data: { plan: chosenPlan } } })
+      ? await authCall('signup', {
+          email, password,
+          options: { data: { plan: planAvailable(chosenPlan) ? chosenPlan : 'free' } }
+        })
         : await authCall('token?grant_type=password', { email, password });
       if (!data.access_token) {
         setMessage('#cloudAuthError', 'Check your email to confirm the account, then sign in.', 'good');

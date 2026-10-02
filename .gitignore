@@ -32,3 +32,6 @@ web-progress.json
 
 # this laptop's own fixed public address (machine specific)
 tunnel.json
+
+# regenerable screenshots from the harness visual checks
+harness/shot-*.png

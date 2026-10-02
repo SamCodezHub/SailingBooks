@@ -14,18 +14,24 @@ const check = (ok, label, extra) => { if (!ok) bad++; say('   ' + (ok ? 'ok  ' :
 
 const REPORT = `JSON.stringify((() => {
   const grid = document.getElementById('planGrid');
+  const chooser = document.getElementById('planChooser');
   const cards = [...document.querySelectorAll('.plan-card')];
-  const checked = cards.filter(c => c.getAttribute('aria-checked') === 'true');
+  const selectable = cards.filter(c => c.getAttribute('aria-disabled') !== 'true');
+  const checked = selectable.filter(c => c.getAttribute('aria-checked') === 'true');
+  const pill = (c) => { const p = c.querySelector('.plan-pill'); return p ? p.textContent : ''; };
   return {
     gridPresent: !!grid,
+    chooserHidden: chooser ? chooser.classList.contains('hidden') : null,
     cards: cards.length,
     names: cards.map(c => (c.querySelector('.plan-name') || {}).textContent),
     specs: cards.map(c => (c.querySelector('.plan-spec') || {}).textContent),
     seats: cards.map(c => (c.querySelector('.plan-seats') || {}).textContent),
     features: cards.map(c => [...c.querySelectorAll('.plan-features li')].map(li => li.textContent)),
+    disabled: cards.filter(c => c.getAttribute('aria-disabled') === 'true').map(c => (c.querySelector('.plan-name') || {}).textContent),
+    disabledPills: cards.filter(c => c.getAttribute('aria-disabled') === 'true').map(pill),
+    selectableNames: selectable.map(c => (c.querySelector('.plan-name') || {}).textContent),
     checkedCount: checked.length,
     checkedName: checked[0] ? (checked[0].querySelector('.plan-name') || {}).textContent : null,
-    recommended: cards.filter(c => !!c.querySelector('.plan-pill')).map(c => (c.querySelector('.plan-name') || {}).textContent),
     // explicit instruction: no prices anywhere in the chooser
     anyCurrency: (grid ? grid.textContent : '').match(/[₹$€£¥]|\\d+\\s*\\/\\s*(month|year|mo)|per month|monthly|price/i) ? (grid.textContent.match(/[₹$€£¥]|\\d+\\s*\\/\\s*(month|year|mo)|per month|monthly|price/i)[0]) : null,
     planLine: (document.getElementById('cloudPlanLine') || {}).textContent || '',
@@ -33,9 +39,9 @@ const REPORT = `JSON.stringify((() => {
     authSub: (document.getElementById('cloudAuthSub') || {}).textContent || '',
     submitText: (document.getElementById('cloudAuthSubmit') || {}).textContent || '',
     eyebrow: (document.getElementById('cloudAuthEyebrow') || {}).textContent || '',
+    authError: (document.getElementById('cloudAuthError') || {}).textContent || '',
     toggleExists: !!document.getElementById('cloudAuthToggle'),
-    stored: localStorage.getItem('sb-cloud-plan-v1'),
-    accountPlan: localStorage.getItem('sb-cloud-account-plan-v1')
+    stored: localStorage.getItem('sb-cloud-plan-v1')
   };
 })())`;
 
@@ -89,8 +95,20 @@ app.whenReady().then(async () => {
   await new Promise(r => setTimeout(r, 1200));
 
   let r = JSON.parse(await win.webContents.executeJavaScript(REPORT));
-  say('\n  the plan chooser\n');
-  check(r.gridPresent, 'the chooser is on the sign-in page');
+  say('\n  signing in: no plan question\n');
+  check(r.gridPresent, 'the plans exist on the page');
+  check(r.chooserHidden === true, 'they are hidden while signing in', 'hidden=' + r.chooserHidden);
+  check(r.submitText === 'Sign in', 'the panel is asking to sign in', r.submitText);
+
+  // --- now create an account, which is where the plan question belongs ---
+  await authReady(win);
+  await win.webContents.executeJavaScript(TOGGLE_SIGNUP);
+  await new Promise(r2 => setTimeout(r2, SETTLE));
+  r = JSON.parse(await win.webContents.executeJavaScript(REPORT));
+
+  say('\n  creating an account: the four plans\n');
+  check(r.chooserHidden === false, 'choosing to create an account reveals them', 'hidden=' + r.chooserHidden);
+  check(r.submitText === 'Create account', 'the panel is asking to create an account', r.submitText);
   check(r.cards === 4, 'it offers four plans', r.cards + ' cards');
   check(JSON.stringify(r.names) === JSON.stringify(['Free', 'Plus', 'Pro', 'Library']),
     'named Free, Plus, Pro and Library', r.names.join(', '));
@@ -103,17 +121,31 @@ app.whenReady().then(async () => {
   check(/per GB/i.test(r.specs[3]), 'Library is charged per GB', r.specs[3]);
   check(r.features.every(f => f.length >= 4), 'every card lists what it includes',
     r.features.map(f => f.length).join('/'));
-  check(r.checkedCount === 1, 'exactly one plan is chosen', r.checkedName);
-  check(r.recommended.length === 1, 'one card is marked recommended', r.recommended.join(', '));
   check(!r.anyCurrency, 'no price or currency anywhere in the chooser', r.anyCurrency ? 'found: ' + r.anyCurrency : 'none');
 
-  // --- choosing one plan ---
-  say('\n  choosing a plan\n');
+  say('\n  only Free is open today\n');
+  check(JSON.stringify(r.selectableNames) === JSON.stringify(['Free']),
+    'Free is the only plan that can be chosen', r.selectableNames.join(', '));
+  check(JSON.stringify(r.disabled) === JSON.stringify(['Plus', 'Pro', 'Library']),
+    'Plus, Pro and Library are marked unavailable', r.disabled.join(', ') || 'none');
+  check(r.disabledPills.every(p => /unavailable/i.test(p)) && r.disabledPills.length === 3,
+    'each says "Unavailable for now"', r.disabledPills.join(' | '));
+  check(r.checkedName === 'Free', 'Free starts out chosen', r.checkedName);
+
+  // --- a closed plan cannot be chosen, and says so ---
   await win.webContents.executeJavaScript(PICK('Pro'));
-  r = JSON.parse(await win.webContents.executeJavaScript(REPORT));
-  check(r.checkedName === 'Pro', 'clicking a card chooses it', r.checkedName);
-  check(r.checkedCount === 1, 'and it is the only one chosen');
-  check(r.stored === 'pro', 'the choice is remembered on the device', r.stored);
+  await new Promise(r2 => setTimeout(r2, SETTLE));
+  let after = JSON.parse(await win.webContents.executeJavaScript(REPORT));
+  check(after.checkedName === 'Free', 'clicking Pro does not select it', after.checkedName);
+  check(/not available/i.test(after.authError), 'and it explains why', after.authError);
+  check((after.stored || '') === 'free' || after.stored === null, 'nothing unavailable was stored', after.stored);
+
+  // --- the panel reflects the plan that is chosen ---
+  check(r.planLineHidden === false, 'it says which plan new accounts start on', r.planLine);
+  check(/Free/.test(r.planLine) && /1 GB/.test(r.planLine) && /1 person/.test(r.planLine),
+    'with its storage and readers', r.planLine);
+  check(r.authSub === 'Start with 1 GB of private online book storage.',
+    'and the sign-up line reads properly', r.authSub);
 
   // --- and it survives a reload ---
   await win.reload();
@@ -124,35 +156,18 @@ app.whenReady().then(async () => {
     return 'ok';
   })()`);
   await new Promise(r2 => setTimeout(r2, 1000));
-  r = JSON.parse(await win.webContents.executeJavaScript(REPORT));
-  check(r.checkedName === 'Pro', 'still chosen after a reload', r.checkedName);
-
-  // --- the sign-up panel follows the choice ---
   await authReady(win);
   await win.webContents.executeJavaScript(TOGGLE_SIGNUP);
   await new Promise(r2 => setTimeout(r2, SETTLE));
   r = JSON.parse(await win.webContents.executeJavaScript(REPORT));
-  check(r.planLineHidden === false, 'creating an account shows which plan is picked',
-    'submit=' + r.submitText + ' eyebrow=' + r.eyebrow + ' toggle=' + r.toggleExists + ' | ' + r.planLine);
-  check(/Pro/.test(r.planLine) && /100 GB/.test(r.planLine) && /4 people/.test(r.planLine),
-    'and states its storage and readers', r.planLine);
-  check(r.authSub === 'Start with 100 GB of private online book storage.',
-    'the sign-up line reads properly for the chosen plan', r.authSub);
+  check(r.chooserHidden === false && r.checkedName === 'Free',
+    'still offering the plans with Free chosen after a reload', r.checkedName);
 
-  // --- switching plans moves it ---
-  await win.webContents.executeJavaScript(PICK('Library'));
-  await new Promise(r2 => setTimeout(r2, SETTLE));
-  r = JSON.parse(await win.webContents.executeJavaScript(REPORT));
-  check(/Library/.test(r.planLine) && /200\+/.test(r.planLine), 'choosing another plan updates the line', r.planLine);
-  check(/charged per GB/i.test(r.planLine), 'with that plan\'s own wording', r.planLine);
-  check(r.authSub === 'Storage is charged per GB you use.',
-    'and the sign-up line reads properly for it too', r.authSub);
-
-  // --- signing back in hides it, since the plan already belongs to them ---
+  // --- signing back in hides them again ---
   await win.webContents.executeJavaScript(TOGGLE_SIGNUP);
   await new Promise(r2 => setTimeout(r2, SETTLE));
   r = JSON.parse(await win.webContents.executeJavaScript(REPORT));
-  check(r.planLineHidden === true, 'signing in does not imply changing the plan');
+  check(r.chooserHidden === true, 'signing in puts the plan question away again');
 
   say('');
   say('  ' + (bad ? bad + ' problem(s)' : 'the plan chooser behaves, and shows no prices'));

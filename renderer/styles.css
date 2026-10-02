@@ -875,17 +875,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .landing-notes { display:flex; flex-wrap:wrap; gap:9px; margin-top:32px; }
 .landing-notes span { padding:8px 12px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:var(--panel); font-size:11px; }
 
-    /* ---- Plan chooser on the sign-in page ----
-       Four cards side by side, the middle ones marked, one picked at a time.
-       Storage and simultaneous readers are the two numbers that matter, so they
-       are the two lines given the most weight; everything else is a tick list. */
-    .plan-chooser { grid-column:1 / -1; margin-top:clamp(28px,4vw,56px); }
-    .plan-chooser-head h2 { margin:12px 0 8px; color:var(--strong); font-family:var(--font-display); font-size:clamp(22px,2.4vw,30px); letter-spacing:-.03em; }
-    .plan-chooser-head p { margin:0 0 22px; color:var(--muted); font-size:14px; max-width:620px; line-height:1.6; }
-    .plan-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+/* ---- Plan chooser, shown while creating an account ----
+       Four cards in the copy column: two by two, so they stay readable instead
+       of stretching the width of the page. Storage and simultaneous readers are
+       the two numbers that matter, so they get the most weight; the rest is a
+       tick list. Plans that are not open yet say so and cannot be chosen. */
+    .plan-chooser { margin-top:clamp(28px,3.5vw,44px); }
+    .plan-chooser.hidden { display:none; }
+    .plan-chooser-head h2 { margin:12px 0 6px; color:var(--strong); font-family:var(--font-display); font-size:clamp(20px,2vw,26px); letter-spacing:-.03em; }
+    .plan-chooser-head p { margin:0 0 18px; color:var(--muted); font-size:13.5px; max-width:520px; line-height:1.6; }
+    .plan-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; max-width:660px; }
     .plan-card {
       position:relative; display:flex; flex-direction:column; gap:0; text-align:left;
-      padding:22px 20px 24px; border:1px solid var(--line); border-radius:var(--radius);
+      padding:18px 18px 20px; border:1px solid var(--line); border-radius:var(--radius);
       background:var(--panel); cursor:pointer; color:var(--ink);
       transition:border-color .16s ease, transform .16s ease, box-shadow .16s ease;
     }
@@ -895,17 +897,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
       border-color:var(--focus); box-shadow:0 0 0 1px var(--focus) inset, var(--shadow);
       background:var(--panel); background-image:var(--focus-soft);
     }
+    /* Not open yet: present, honest about it, and not clickable. */
+    .plan-card[aria-disabled="true"] { cursor:not-allowed; opacity:.62; border-style:dashed; }
+    .plan-card[aria-disabled="true"]:hover { transform:none; box-shadow:none; }
     .plan-pill {
-      position:absolute; top:16px; right:16px; padding:3px 9px; border-radius:999px;
+      position:absolute; top:14px; right:14px; padding:3px 9px; border-radius:999px;
       font-size:9.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
       color:var(--on-accent); background:var(--focus);
     }
+    .plan-pill.soon { color:var(--muted); background:var(--soft); border:1px solid var(--line); }
     .plan-name { font-size:15px; font-weight:750; font-family:var(--font-display); }
     .plan-tagline { margin-top:5px; color:var(--muted); font-size:12.5px; min-height:34px; line-height:1.45; }
-    .plan-spec { margin-top:16px; font-size:clamp(19px,1.7vw,23px); font-weight:750; letter-spacing:-.02em; color:var(--strong); line-height:1.15; }
+    .plan-spec { margin-top:14px; font-size:19px; font-weight:750; letter-spacing:-.02em; color:var(--strong); line-height:1.15; }
     .plan-seats { margin-top:5px; color:var(--muted); font-size:12.5px; }
-    .plan-rule { height:1px; background:var(--line); margin:18px 0 14px; }
-    .plan-features { list-style:none; margin:0; padding:0; display:grid; gap:9px; }
+    .plan-rule { height:1px; background:var(--line); margin:16px 0 12px; }
+    .plan-features { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
     .plan-features li { display:flex; gap:9px; align-items:flex-start; color:var(--muted); font-size:12.5px; line-height:1.45; }
     .plan-features li::before {
       content:"✓"; flex:none; width:15px; height:15px; margin-top:1px; border-radius:50%;
@@ -918,7 +924,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
       background:var(--soft); color:var(--muted); font-size:12.5px;
     }
     .auth-plan b { color:var(--ink); font-weight:700; }
-    @media (max-width:1180px) { .plan-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media (max-width:620px) { .plan-grid { grid-template-columns:1fr; } .plan-tagline { min-height:0; } }
 .cloud-auth-card { padding:clamp(22px,4vw,34px); border:var(--surface-border); border-radius:calc(var(--radius) + 4px); background:var(--panel); background-image:var(--surface-image); box-shadow:var(--shadow-lg); }
 .auth-heading h2 { margin:9px 0 5px; font-family:var(--font-display); font-size:25px; letter-spacing:-.035em; }
@@ -982,6 +987,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .server-pairing { max-width:100%; margin:0 0 12px; padding:12px; border:1px solid var(--focus); border-radius:var(--control-radius); color:var(--ink); background:var(--focus-soft); font-size:11px; overflow-wrap:anywhere; }
 .server-pairing code { user-select:all; }
 .server-pairing.hidden { display:none; }
+/* Below this width the two-column landing squeezes the copy column until the
+   plan cards are unusably narrow, so the page becomes one column and the cards
+   get the full width instead. */
+@media (max-width:1120px) {
+    #cloudLanding:not(.hidden) { grid-template-columns:1fr; align-content:start; gap:34px; }
+    .landing-copy h1 { font-size:clamp(38px,7vw,64px); }
+    .plan-grid { max-width:720px; }
+    .cloud-auth-card { max-width:560px; }
+}
 @media (max-width:760px) {
   #topbar { gap:8px; padding:9px 10px; min-height:56px; }
   .topbar-brand { font-size:0; gap:0; }
