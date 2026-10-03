@@ -5,6 +5,10 @@ node_modules/
 dist/
 dist-all/
 web/dist/
+release/
 .git/
 *.blockmap
 *.log
+# Regenerable harness screenshots and local notes.
+harness/shot-*.png
+process.md

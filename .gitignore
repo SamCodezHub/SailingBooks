@@ -35,3 +35,5 @@ tunnel.json
 
 # regenerable screenshots from the harness visual checks
 harness/shot-*.png
+
+.env*
