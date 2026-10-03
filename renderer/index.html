@@ -20,6 +20,7 @@
     </nav>
     <input id="searchInput" type="search" placeholder="Search books…" autocomplete="off" />
     <button id="btnAccount" class="account-btn" type="button">Sign in</button>
+    <span id="accountPlanPill" class="account-plan-pill hidden"></span>
     <button id="btnSettings" class="topbar-btn" title="Settings" aria-label="Settings">&#9881;&#xfe0e;</button>
   </header>
 
@@ -142,8 +143,8 @@
       <section id="planChooser" class="plan-chooser hidden" aria-label="Choose a plan">
         <div class="plan-chooser-head">
           <span class="eyebrow">CHOOSE YOUR SHELF</span>
-          <h2>Four ways to keep a library</h2>
-          <p>How much room you need, and how many people can read at the same time.</p>
+        <h2>Choose your plan</h2>
+        <p>How much room you need, and how many people can read at the same time.</p>
         </div>
         <div id="planGrid" class="plan-grid" role="radiogroup" aria-label="Plans"></div>
       </section>
@@ -151,6 +152,7 @@
     <section class="cloud-auth-card" aria-label="Account sign in">
       <div class="auth-heading"><span class="eyebrow" id="cloudAuthEyebrow">WELCOME BACK</span><h2 id="cloudAuthTitle">Sign in to your library</h2><p id="cloudAuthSub">Your local books stay on this computer.</p></div>
       <p id="cloudPlanLine" class="auth-plan hidden"></p>
+      <p id="cloudPlanGateNote" class="plan-gate-note hidden"></p>
       <form id="cloudAuthForm">
         <label class="cloud-field"><span>Email</span><input id="cloudEmail" type="email" autocomplete="email" required placeholder="you@example.com"/></label>
         <label class="cloud-field"><span>Password</span><input id="cloudPassword" type="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters"/></label>
@@ -158,6 +160,7 @@
         <button id="cloudAuthSubmit" class="btn primary cloud-submit" type="submit">Sign in</button>
       </form>
       <button id="cloudAuthToggle" class="auth-toggle" type="button">New here? Create an account</button>
+      <button id="cloudPlanContinue" class="btn primary plan-continue hidden" type="button">Continue</button>
     </section>
   </main>
 

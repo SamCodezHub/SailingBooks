@@ -11,6 +11,10 @@
   let books = [];
   let servers = [];
   let account = null;
+  // The plan of the account signed in right now, so the badge beside the name
+  // is right from the moment it is chosen rather than whenever the server
+  // next answers.
+  let currentPlan = null;
   let refreshPromise = null;
   const hostedLanding = !!(window.api && window.api.mode === 'web' && !window.SB_SERVED_BY_LAPTOP);
 
@@ -255,25 +259,99 @@
       identity.textContent = email;
       identity.title = plan.name + ' · ' + plan.storage + ' · ' + plan.seats;
     }
+    // ...and the same in the top bar, beside the name, so it is always in sight.
+    const pill = $('#accountPlanPill');
+    if (pill) {
+      if (email && plan) {
+        pill.textContent = plan.name;
+        pill.title = plan.name + ' · ' + plan.storage + ' · ' + plan.seats;
+        pill.classList.remove('hidden');
+      } else {
+        pill.classList.add('hidden');
+        pill.textContent = '';
+      }
+    }
     $('#libraryNav')?.classList.toggle('hidden', hostedLanding && !session);
+  }
+  // The panel's heading is shared by two steps, so it lives in one place: signing
+  // in, creating an account, and choosing a plan all rewrite the same three lines.
+  function paintAuthHeading() {
+    $('#cloudAuthEyebrow').textContent = isSignup ? 'MAKE IT YOURS' : 'WELCOME BACK';
+    $('#cloudAuthTitle').textContent = isSignup ? 'Create your account' : 'Sign in to your library';
+    $('#cloudAuthSub').textContent = isSignup
+      ? 'Pick a name and password. We will send you a link to confirm it.'
+      : 'Your local books stay on this computer.';
   }
   function showAuthMode(signup) {
     isSignup = !!signup;
-    $('#cloudAuthEyebrow').textContent = isSignup ? 'MAKE IT YOURS' : 'WELCOME BACK';
-    $('#cloudAuthTitle').textContent = isSignup ? 'Create your account' : 'Sign in to your library';
-    const plan = chosenPlanInfo();
-    // On sign-up the line describes the plan just chosen. On sign-in the plan
-    // already belongs to the account, so the line stays the reassuring one.
-    $('#cloudAuthSub').textContent = isSignup && plan ? plan.signupLine
-      : 'Your local books stay on this computer.';
+    paintAuthHeading();
     $('#cloudPassword').autocomplete = isSignup ? 'new-password' : 'current-password';
     $('#cloudAuthSubmit').textContent = isSignup ? 'Create account' : 'Sign in';
     $('#cloudAuthToggle').textContent = isSignup ? 'Already have an account? Sign in' : 'New here? Create an account';
     setMessage('#cloudAuthError', '');
-    // The plan is chosen as part of creating an account, so the chooser belongs
-    // to that step and stays out of the way when signing back in.
-    $('#planChooser')?.classList.toggle('hidden', !isSignup);
+    // Creating an account is deliberately ordinary: a name, a password, and then
+    // an email to confirm. The plan is chosen after that, once the address is
+    // known to be real.
+    // Leaving the gate matters as much as opening it: its note and its button
+    // must never outlive the step that put them there.
+    hidePlanGate();
+    $('#cloudPlanLine')?.classList.add('hidden');
+    $('#planChooser')?.classList.add('hidden');
     renderPlanSelection();
+  }
+
+  /* ---- choosing a plan, after the address is verified ---- */
+  function showPlanGate() {
+    $('#planChooser')?.classList.remove('hidden');
+    // While the gate is up the card is not asking anyone to sign in, so it stops
+    // claiming to be.
+    $('#cloudAuthEyebrow').textContent = 'ONE LAST THING';
+    $('#cloudAuthTitle').textContent = 'Choose your plan';
+    $('#cloudAuthSub').textContent = 'Your account is confirmed and ready.';
+    const note = $('#cloudPlanGateNote');
+    const plan = chosenPlanInfo();
+    if (note) {
+      note.classList.remove('hidden');
+      note.innerHTML = plan
+        ? `Pick <b>${esc(plan.name)}</b> and your library is ready to use.`
+        : 'Pick a plan and your library is ready to use.';
+    }
+    $('#cloudPlanContinue')?.classList.remove('hidden');
+    $('#cloudAuthForm')?.classList.add('hidden');
+    $('#cloudAuthToggle')?.classList.add('hidden');
+    $('#cloudPlanLine')?.classList.add('hidden');
+  }
+  function hidePlanGate() {
+    paintAuthHeading();
+    const note = $('#cloudPlanGateNote');
+    if (note) { note.classList.add('hidden'); note.innerHTML = ''; }
+    $('#cloudPlanContinue')?.classList.add('hidden');
+    $('#cloudAuthForm')?.classList.remove('hidden');
+    $('#cloudAuthToggle')?.classList.remove('hidden');
+  }
+  // Reads the plan off the signed-in account. Supabase keeps it in user metadata,
+  // which is where sign-up and the choice both write it.
+  async function accountPlanFromServer(token) {
+    try {
+      const cfg = await loadConfig();
+      const response = await fetch(cfg.url + '/auth/v1/user', {
+        headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + token }
+      });
+      if (!response.ok) return null;
+      const me = await response.json().catch(() => null);
+      const plan = me && me.user_metadata && me.user_metadata.plan;
+      return planAvailable(plan) ? plan : null;
+    } catch { return null; }
+  }
+  async function saveAccountPlan(token, planId) {
+    const cfg = await loadConfig();
+    const response = await fetch(cfg.url + '/auth/v1/user', {
+      method: 'PUT',
+      headers: { apikey: cfg.anonKey, 'content-type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ data: { plan: planId } })
+    });
+    if (!response.ok) throw new Error('Could not save your plan choice.');
+    return true;
   }
 
   /* ---- plan chooser ---- */
@@ -320,14 +398,10 @@
         card.setAttribute('aria-checked', String(card.dataset.planId === chosenPlan));
       }
     }
-    const line = $('#cloudPlanLine');
-    const plan = chosenPlanInfo();
-    if (!line) return;
-    // Signing in to an existing account: the plan is already theirs, so the
-    // line stays out of the way rather than implying it will change.
-    if (!isSignup || !plan) { line.classList.add('hidden'); line.textContent = ''; return; }
-    line.classList.remove('hidden');
-    line.innerHTML = `New accounts start on <b>${esc(plan.name)}</b> · ${esc(plan.storage)} · ${esc(plan.seats)}`;
+    // The plan line belongs to the gate, not to signing in: an empty element with
+    // no rule for its hidden state still paints, which is a stray grey bar.
+    const gateOpen = !$('#planChooser')?.classList.contains('hidden');
+    if (gateOpen) showPlanGate();
   }
   function choosePlan(id) {
     if (!PLAN_IDS.includes(id) || !planAvailable(id)) return;
@@ -349,6 +423,9 @@
   // say so. The server may report one too; that always wins.
   function accountPlanId() {
     if (account && account.plan && PLAN_IDS.includes(account.plan)) return account.plan;
+    // The plan just chosen this minute. Waiting for the server to echo it back
+    // left the badge empty in the corner for as long as it took to load.
+    if (PLAN_IDS.includes(currentPlan)) return currentPlan;
     const email = (account && account.user && account.user.email) || (session && session.email) || '';
     if (!email) return null;
     try {
@@ -357,7 +434,9 @@
     } catch { return null; }
   }
   function rememberAccountPlan(email, planId) {
-    if (!email || !PLAN_IDS.includes(planId)) return;
+    if (!PLAN_IDS.includes(planId)) return;
+    currentPlan = planId;
+    if (!email) return;
     try { localStorage.setItem(ACCOUNT_PLAN_KEY, JSON.stringify({ email, plan: planId })); } catch {}
   }
   async function submitAuth(event) {
@@ -368,23 +447,36 @@
     setMessage('#cloudAuthError', 'Connecting…');
     try {
 const data = isSignup
-      // The chosen plan rides along in the account's metadata, which Supabase
-      // stores for us. No schema change needed here, and the server can read it
-      // when it sets the quota and the simultaneous-reader limit.
-      ? await authCall('signup', {
-          email, password,
-          options: { data: { plan: planAvailable(chosenPlan) ? chosenPlan : 'free' } }
-        })
+      // Sign-up asks for an address and a password and nothing else: no plan
+      // question here, because the address has not been confirmed yet.
+      ? await authCall('signup', { email, password })
         : await authCall('token?grant_type=password', { email, password });
       if (!data.access_token) {
-        setMessage('#cloudAuthError', 'Check your email to confirm the account, then sign in.', 'good');
+        // The address is not confirmed yet, so the account is not finished. Go
+        // back to the sign-in form and say plainly what is being waited for,
+        // rather than leaving the person on a sign-up form they have finished.
+        showAuthMode(false);
+        setMessage('#cloudAuthError', 'We sent a verification link to ' + email + '. Sign in once you have clicked it.', 'good');
         return;
       }
-      await sessionSave({ ...data, expires_at: Date.now() + Number(data.expires_in || 3600) * 1000 });
-      // Sign-up is the only moment the plan is chosen, so this is where it is
-      // recorded against the account for the signed-in view.
-      if (isSignup) rememberAccountPlan(email, chosenPlan);
+      // The address is kept on the session: the badge beside the name is looked up
+      // by it, and Supabase's token reply does not always carry one.
+      await sessionSave({ ...data, email: data.email || email, expires_at: Date.now() + Number(data.expires_in || 3600) * 1000 });
       $('#cloudPassword').value = '';
+
+      // Signed in. An account without a plan has not finished setting up, so the
+      // plan question comes now - after the address is confirmed - and the
+      // library waits until it is answered.
+      const planOnAccount = await accountPlanFromServer(data.access_token);
+      if (!planOnAccount) {
+        setPage('landing');
+        hidePlanGate();
+        showPlanGate();
+        updateAccountButton();
+        return;
+      }
+      rememberAccountPlan(email, planOnAccount);
+      hidePlanGate();
       await refreshOnline();
       updateAccountButton();
       setPage('online');
@@ -619,7 +711,7 @@ const data = isSignup
   }
   async function signOut() {
     try { if (session?.access_token) await authCall('logout', {}, session.access_token); } catch {}
-    await sessionSave(null); account = null; books = []; updateAccountButton();
+    await sessionSave(null); account = null; currentPlan = null; books = []; updateAccountButton();
     setPage(hostedLanding ? 'landing' : 'local');
     if (hostedLanding) showAuthMode(false);
   }
@@ -640,6 +732,24 @@ const data = isSignup
     $('#navOnlineLibrary').onclick = () => { if (session) setPage('online'); else setPage('landing'); };
     $('#btnAccount').onclick = () => { setPage(session ? 'online' : 'landing'); if (!session) showAuthMode(false); };
     $('#cloudAuthToggle').onclick = () => showAuthMode(!isSignup);
+    // Finishing setup: the plan is written to the account, and only then does the
+    // library open.
+    $('#cloudPlanContinue').onclick = async () => {
+      const btn = $('#cloudPlanContinue');
+      btn.disabled = true;
+      setMessage('#cloudAuthError', 'Setting up your library.');
+      try {
+        await saveAccountPlan(session.access_token, chosenPlan);
+        rememberAccountPlan((account && account.user && account.user.email) || session.email || '', chosenPlan);
+        setMessage('#cloudAuthError', '');
+        hidePlanGate();
+        $('#planChooser')?.classList.add('hidden');
+        await refreshOnline();
+        setPage('online');
+      } catch (error) {
+        setMessage('#cloudAuthError', error.message, 'bad');
+      } finally { btn.disabled = false; }
+    };
     $('#cloudAuthForm').addEventListener('submit', submitAuth);
     $('#cloudFileInput').addEventListener('change', handleUpload);
     $('#cloudRefresh').onclick = () => refreshOnline().catch(error => setMessage('#cloudUploadStatus', error.message, 'bad'));

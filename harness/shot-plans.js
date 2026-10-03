@@ -43,8 +43,35 @@ app.whenReady().then(async () => {
       if (/create an account/i.test(s)) break;
       await new Promise(r => setTimeout(r, 250));
     }
-    await win.webContents.executeJavaScript(`document.getElementById('cloudAuthToggle').click(); 'ok'`);
-    await new Promise(r => setTimeout(r, 700));
+    // The plans appear only once an address is confirmed, so open that step
+    // rather than the sign-in form, which correctly shows none. Opening it this
+    // way is artificial, and a session check landing afterwards closes the gate
+    // again, so wait until it is genuinely on screen before the shutter.
+    const GATE = `(() => {
+      document.getElementById('planChooser').classList.remove('hidden');
+      const n = document.getElementById('cloudPlanGateNote');
+      n.classList.remove('hidden');
+      document.getElementById('cloudAuthEyebrow').textContent = 'ONE LAST THING';
+      document.getElementById('cloudAuthTitle').textContent = 'Choose your plan';
+      document.getElementById('cloudAuthSub').textContent = 'Your account is confirmed and ready.';
+      n.innerHTML = 'Pick <b>Free</b> and your library is ready to use.';
+      document.getElementById('cloudPlanContinue').classList.remove('hidden');
+      document.getElementById('cloudAuthForm').classList.add('hidden');
+      document.getElementById('cloudAuthToggle').classList.add('hidden');
+      return 'ok';
+    })()`;
+    const gateUp = `(() => {
+      const c = document.getElementById('planChooser');
+      return getComputedStyle(c).display !== 'none' &&
+        document.querySelectorAll('.plan-card').length === 4;
+    })()`;
+    let open = false;
+    for (let i = 0; i < 12; i++) {
+      await win.webContents.executeJavaScript(GATE);
+      await new Promise(r => setTimeout(r, 350));
+      if (await win.webContents.executeJavaScript(gateUp)) { open = true; break; }
+    }
+    if (!open) { say('\n  ' + label + ': the plan step would not stay open'); continue; }
 
     // how the cards actually sit on the page
     const layout = await win.webContents.executeJavaScript(`JSON.stringify((() => {
@@ -55,11 +82,15 @@ app.whenReady().then(async () => {
       });
       const auth = document.querySelector('.cloud-auth-card').getBoundingClientRect();
       const grid = document.getElementById('planGrid').getBoundingClientRect();
+      const chooser = document.getElementById('planChooser').getBoundingClientRect();
       return {
         cards,
         rows: new Set(cards.map(() => 0)).size && [...document.querySelectorAll('.plan-card')].map(c => Math.round(c.getBoundingClientRect().top)).filter((v, i, a) => a.indexOf(v) === i).length,
         authWidth: Math.round(auth.width),
         gridWidth: Math.round(grid.width),
+        chooserTop: Math.round(chooser.top),
+        chooserHeight: Math.round(chooser.height),
+        onScreen: chooser.top < window.innerHeight && chooser.bottom > 0,
         pageWidth: window.innerWidth,
         anyOverflow: document.documentElement.scrollWidth > window.innerWidth + 1
       };
@@ -68,7 +99,15 @@ app.whenReady().then(async () => {
     say('\n  ' + label + ' (' + L.pageWidth + 'px)');
     say('    cards: ' + L.cards.map(c => c.name + ' ' + c.w + 'x' + c.h).join(', '));
     say('    grid ' + L.gridWidth + 'px wide, ' + L.rows + ' row(s); auth card ' + L.authWidth + 'px');
+    say('    chooser at y=' + L.chooserTop + ', ' + L.chooserHeight + 'px tall, on screen: ' + L.onScreen);
     say('    horizontal overflow: ' + (L.anyOverflow ? 'YES - bad' : 'no'));
+
+    // A window that was never shown does not reliably repaint just because a
+    // class changed, so put it on screen (well off to the left, out of the way)
+    // and let a frame land before the shutter.
+    win.setPosition(-4000, 0);
+    win.showInactive();
+    await new Promise(r => setTimeout(r, 900));
 
     const image = await win.webContents.capturePage();
     fss.writeFileSync(OUT.replace('.png', '-' + label + '.png'), image.toPNG());

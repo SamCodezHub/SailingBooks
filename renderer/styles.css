@@ -135,6 +135,11 @@
 }
 
 * { box-sizing: border-box; }
+/* Hiding is done with class="hidden" all over the app, and an element that has
+   its own display (a flex row, an inline-flex pill, a grid) keeps painting when
+   only that class is added - which is how an empty bar ends up on the account
+   page. One blanket rule beats remembering a rule per element. */
+.hidden { display: none !important; }
 /* Covers are <img> tags: never let them start native image-drags
    (those mimic file drops and summon the import overlay). */
 img { -webkit-user-drag: none; user-select: none; }
@@ -924,6 +929,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
       background:var(--soft); color:var(--muted); font-size:12.5px;
     }
     .auth-plan b { color:var(--ink); font-weight:700; }
+    /* Plan shown beside the name in the top bar. */
+    .account-plan-pill {
+      display:inline-flex; align-items:center; padding:5px 10px; border-radius:999px;
+      border:1px solid var(--line); background:var(--soft); color:var(--muted);
+      font-size:11px; font-weight:700; letter-spacing:.02em; white-space:nowrap;
+    }
+    /* Full width, to match the sign-in button it replaces. */
+    .plan-continue { width:100%; margin-top:14px; }
+    /* A plain block, deliberately: as a flex row the <b> around the plan name became
+       its own item and pulled the sentence apart. */
+    .plan-gate-note {
+      display:block; margin:0 0 14px; padding:11px 13px;
+      border-radius:10px; background:var(--focus-soft); color:var(--ink); font-size:13px; line-height:1.55;
+    }
+    .plan-gate-note b { font-weight:750; }
     @media (max-width:620px) { .plan-grid { grid-template-columns:1fr; } .plan-tagline { min-height:0; } }
 .cloud-auth-card { padding:clamp(22px,4vw,34px); border:var(--surface-border); border-radius:calc(var(--radius) + 4px); background:var(--panel); background-image:var(--surface-image); box-shadow:var(--shadow-lg); }
 .auth-heading h2 { margin:9px 0 5px; font-family:var(--font-display); font-size:25px; letter-spacing:-.035em; }
