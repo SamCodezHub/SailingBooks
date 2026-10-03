@@ -119,6 +119,29 @@ app.whenReady().then(async () => {
   check(d.stored === 'ocean', 'the app remembers it', 'stored=' + d.stored);
   check(d.gearRight > 1000, 'the gear sits in the corner, search stays centred', 'right edge ' + d.gearRight);
 
+  // The plan badge sits next to the name, and the gear is pinned to the edge.
+  // Nothing in between may land on top of the gear, which is what happened when
+  // the badge was added outside the gap the account button reserved for it.
+  const bar = JSON.parse(await win2.webContents.executeJavaScript(`(() => {
+    const box = id => { const b = document.getElementById(id).getBoundingClientRect();
+      return { l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width) }; };
+    const pill = document.getElementById('accountPlanPill');
+    pill.textContent = 'Free';
+    pill.classList.remove('hidden');
+    const shown = { pill: box('accountPlanPill'), name: box('btnAccount'), gear: box('btnSettings'), on: getComputedStyle(pill).display !== 'none' };
+    pill.classList.add('hidden');
+    pill.textContent = '';
+    return JSON.stringify({ shown, off: { name: box('btnAccount'), gear: box('btnSettings') } });
+  })()`));
+  const s = bar.shown;
+  check(s.on, 'the plan badge shows beside the name', 'w=' + s.pill.w);
+  check(s.pill.l >= s.name.r, 'and it does not sit on top of the name',
+    'name ends ' + s.name.r + ', badge starts ' + s.pill.l);
+  check(s.pill.r <= s.gear.l, 'nor on top of the settings gear',
+    'badge ends ' + s.pill.r + ', gear starts ' + s.gear.l);
+  check(bar.off.name.r <= bar.off.gear.l, 'and the name alone stays clear of the gear either way',
+    'name ends ' + bar.off.name.r + ', gear starts ' + bar.off.gear.l);
+
   console.log('\n  ' + (bad ? bad + ' problem(s)' : 'settings and themes work in both') + '\n');
   app.exit(bad ? 1 : 0);
 }).catch(e => { console.error(e); app.exit(1); });
