@@ -63,6 +63,10 @@
   const chosenPlanInfo = () => planById(chosenPlan);
 
   function apiBase() {
+    // An installed phone app runs on its own local origin, which is not the
+    // account service, so it is told where to look rather than guessing from the
+    // page it happens to be in.
+    if (window.SB_API_BASE) return window.SB_API_BASE;
     // Keep hosted builds on their own origin, including Vercel preview/custom
     // domains. That avoids cross-origin preflights for the account API. A page
     // served by the laptop or Electron still uses the production cloud API.

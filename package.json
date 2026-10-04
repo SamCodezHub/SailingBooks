@@ -18,7 +18,10 @@
     "build:web": "node web/build.js",
     "deploy": "node web/build.js && vercel deploy --prod",
     "dist": "electron-builder --win",
-    "dist-all": "electron-builder -w -m -l"
+    "dist-all": "electron-builder -w -m -l",
+    "icons:android": "electron tools/make-android-icons.js",
+    "apk": "node web/build.js && cap sync android && electron tools/make-android-icons.js && cd android && gradlew.bat assembleRelease",
+    "apk:install": "adb install -r android/app/build/outputs/apk/release/app-release.apk"
   },
   "dependencies": {
     "jszip": "^3.10.1",
@@ -26,6 +29,9 @@
     "pdfjs-dist": "^3.4.120"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
     "electron": "^43.0.0",
     "electron-builder": "^26.0.12"
   },

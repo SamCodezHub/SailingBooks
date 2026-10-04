@@ -4,6 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#ffffff" />
+<!-- The installed phone app is served from its own local origin, not from the
+     account service, so it is told where the account service lives. Every other
+     client works it out from the address bar instead, which is what keeps preview
+     and custom domains pointing at themselves. -->
+<meta name="sb-api-base" content="https://sailingbooks.vercel.app/api/cloud" />
+<script>
+  (function () {
+    var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    if (!native && location.hostname === 'localhost') native = true;
+    if (!native) return;
+    var meta = document.querySelector('meta[name="sb-api-base"]');
+    if (meta && meta.content) window.SB_API_BASE = meta.content;
+  })();
+</script>
 <title>Sailing Books</title>
 <link rel="stylesheet" href="styles.css" />
 <script src="../node_modules/jszip/dist/jszip.min.js"></script>

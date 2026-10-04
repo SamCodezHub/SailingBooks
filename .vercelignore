@@ -6,6 +6,7 @@ dist/
 dist-all/
 web/dist/
 release/
+android/
 .git/
 *.blockmap
 *.log
