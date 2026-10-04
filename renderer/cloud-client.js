@@ -17,6 +17,21 @@
   let currentPlan = null;
   let refreshPromise = null;
   const hostedLanding = !!(window.api && window.api.mode === 'web' && !window.SB_SERVED_BY_LAPTOP);
+  // The installed phone app, which is the web client running inside an app
+  // rather than in a browser tab.
+  const nativeApp = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  /* Whether there is a library on this side of the screen to put books into.
+   *
+   * The desktop app has one on the computer. The phone app has one on the phone.
+   * A browser paired with the computer is reading the computer's library, so it
+   * has one too. Only the website on its own, with no computer behind it, has
+   * nothing to show - and offering an empty shelf there is worse than not
+   * offering one. */
+  function hasLocalLibrary() {
+    if (!WEB) return true;
+    if (nativeApp()) return true;
+    return !window.api?.isBrowserLocalLibrary?.();
+  }
 
   /* The four ways to hold a library. Storage and simultaneous readers are what
      the plans differ by; the tick list is what each includes. No prices: what a
@@ -105,19 +120,16 @@
     try { if (session) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(session)); else localStorage.removeItem(ACCOUNT_KEY); } catch {}
   }
   function setPage(page) {
-    // The local library belongs to the app. A browser has no library of its own
-    // to show - books reach the computer over Download - so the online shelf is
-    // the only page there, and asking for the local one lands there instead.
-    if (WEB && page === 'local') page = session ? 'online' : 'landing';
+    // Asking for the local library only leads away when there is no library here.
+    if (!hasLocalLibrary() && page === 'local') page = session ? 'online' : 'landing';
     const library = $('#libraryView'), reader = $('#readerView'), landing = $('#cloudLanding'), online = $('#onlineLibraryView');
     if (reader && !reader.classList.contains('hidden') && page !== 'local' && window.closeReader) window.closeReader();
     library?.classList.toggle('hidden', page !== 'local');
     reader?.classList.toggle('hidden', page !== 'reader');
     landing?.classList.toggle('hidden', page !== 'landing');
     online?.classList.toggle('hidden', page !== 'online');
-    // With the local library gone from the browser there is one page left, so
-    // the switch between two of them has nothing to switch between.
-    $('#libraryNav')?.classList.toggle('hidden', WEB || (hostedLanding && page === 'landing') || page === 'reader');
+    // Where there is only the online shelf to show, there is no switch to offer.
+    $('#libraryNav')?.classList.toggle('hidden', !hasLocalLibrary() || (hostedLanding && page === 'landing') || page === 'reader');
     $('#searchInput')?.classList.toggle('hidden', page !== 'local');
     $('#btnSettings')?.classList.toggle('hidden', page === 'landing');
     $('#btnAccount')?.classList.toggle('hidden', page === 'landing');
@@ -625,21 +637,24 @@ const data = isSignup
   }
   /* Download means "into the library", not "onto this machine's disk".
    *
-   * A book in the online library belongs beside the books already on the
-   * computer, so Download puts it there - in the app, and in a browser that is
-   * paired with the computer too, which is what makes the website and the app
-   * agree. Only a browser with no computer to talk to falls back to saving the
-   * file, and it says so rather than quietly doing something else. */
-  async function downloadBook(book) {
+   * A book in the online library belongs beside the books already here, so
+   * Download puts it there - in the desktop app, in the phone app, and in a
+   * browser paired with the computer. Only the website with no library behind it
+   * falls back to saving the file, and it says so rather than quietly doing
+   * something else. */
+async function downloadBook(book) {
     setMessage('#cloudUploadStatus', '');
     const name = book.file_name || book.title || 'book';
     let bytes = null;
     try {
       const response = await apiFile(`/books/${enc(book.id)}/file`);
       bytes = new Uint8Array(await response.arrayBuffer());
-      const saved = window.api?.saveCloudBook
-        ? await window.api.saveCloudBook(book.file_name, bytes, book.id)
-        : { error: 'This device cannot add books to a library.' };
+      if (!hasLocalLibrary()) {
+        saveFileToDisk(name, bytes);
+        setMessage('#cloudUploadStatus', `Saved “${name}” as a file instead: this browser has no library of its own to join.`, 'bad');
+        return;
+      }
+      const saved = await window.api.saveCloudBook(book.file_name, bytes, book.id);
       if (saved?.alreadyAdded) {
         setMessage('#cloudUploadStatus', `“${name}” is already in your local library.`, 'good');
         return;
@@ -704,8 +719,9 @@ const data = isSignup
     // line below from running - leaving a sign-in form that renders but does
     // nothing when pressed. A failed read just means "not signed in".
     session = await sessionRead().catch(() => null);
-    if (WEB) setPage(session ? 'online' : 'landing');
-    else {
+    // Where there is a library, both places are worth offering and the app opens on
+    // its own; where there is not, the online shelf is the page.
+    if (hasLocalLibrary()) {
       $('#navLocalLibrary').onclick = () => setPage('local');
       $('#navOnlineLibrary').onclick = () => { if (session) setPage('online'); else setPage('landing'); };
     }
@@ -741,9 +757,8 @@ const data = isSignup
       $('#serverName').value = 'This computer';
       $('#serverUrl').value = 'http://localhost:8787';
     }
-    // In a browser there is no local library to land in, so the online shelf is
-    // the page it opens on, signed in or not.
-    if (hostedLanding || WEB) {
+    // Without a library of its own the online shelf is the page it opens on.
+    if (!hasLocalLibrary()) {
       if (session?.refresh_token) api('/me').then(() => setPage('online')).catch(() => { sessionSave(null); setPage('landing'); });
       else setPage(session ? 'online' : 'landing');
     } else {
@@ -751,9 +766,10 @@ const data = isSignup
       setPage('local');
       if (session?.refresh_token) api('/me').then(refreshOnline).catch(() => sessionSave(null));
     }
-    // A book arriving in the library is worth going to look at, but only the app
+    // A book arriving in the library is worth going to look at - but only where
+    // there is a library for it to arrive in.
     // has a local library for it to arrive in.
-    if (!WEB) window.addEventListener('sb-cloud-book-downloaded', () => setPage('local'));
+    if (hasLocalLibrary()) window.addEventListener('sb-cloud-book-downloaded', () => setPage('local'));
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
 })();

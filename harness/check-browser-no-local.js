@@ -123,12 +123,12 @@ app.whenReady().then(async () => {
   check(r.actions.includes('Download'), 'with Download on the book', r.actions.join(', '));
   check(r.localUp === false, 'and still no local library', 'localUp=' + r.localUp);
 
-  say('\n  a browser with no computer connected cannot add to a library\n');
-  check(r.isBrowserLibrary === true, 'this browser is its own library, which is the case in question', 'browserLibrary=' + r.isBrowserLibrary);
+  say('\n  the website on its own has no library to join\n');
+  check(r.isBrowserLibrary === true, 'this browser would only have kept one for itself', 'browserLibrary=' + r.isBrowserLibrary);
   await win.webContents.executeJavaScript(`(() => { document.querySelector('.online-book-card [data-action="download"]').click(); return 'clicked'; })()`);
-  r = await waitFor(win, s => /as a file|not connected|could not/i.test(s.status), 30);
-  check(/not connected to your computer/i.test(r.status),
-    'and it says the book could not join the library', r.status);
+  r = await waitFor(win, s => /as a file|no library/i.test(s.status), 30);
+  check(/no library of its own/i.test(r.status),
+    'and it says there is no library here to join', r.status);
   check(/as a file instead/i.test(r.status),
     'while still handing the file over', r.status);
 
