@@ -1,4 +1,4 @@
-# Sailing Books ⛵
+# Sailing Books 
 
 Local-first library and reader for EPUBs, PDFs and audiobooks, with a matching browser companion.
 
