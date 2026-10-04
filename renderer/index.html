@@ -182,8 +182,8 @@
     <div id="cloudUploadStatus" class="cloud-message" role="status"></div>
     <section class="online-books-section"><div class="section-line"><h2>Your books</h2><button id="cloudRefresh" class="btn small ghost" type="button">Refresh</button></div><div id="onlineBooks" class="online-books"><div class="online-empty">Sign in to see your online books.</div></div></section>
     <section class="servers-section">
-      <div class="section-line"><div><div class="eyebrow">CONNECTED COMPUTERS</div><h2>Server library</h2></div><div class="server-head-actions"><select id="targetServerSelect" aria-label="Choose a server"><option value="">Choose a server</option></select><button id="cloudServerRefresh" class="btn small ghost" type="button">Refresh</button></div></div>
-      <p class="section-copy">Connect a computer running Sailing Books to create local copies of books from your online shelf.</p>
+      <div class="section-line"><div><div class="eyebrow">CONNECTED COMPUTERS</div><h2>Other computers</h2></div><div class="server-head-actions"><button id="cloudServerRefresh" class="btn small ghost" type="button">Refresh</button></div></div>
+      <p class="section-copy">Computers running Sailing Books that are connected to this account.</p>
       <form id="serverRegisterForm" class="server-register"><input id="serverName" required maxlength="80" placeholder="Computer name" aria-label="Computer name"/><input id="serverUrl" type="url" required placeholder="https://your-server.example" aria-label="Server address"/><button class="btn" type="submit">Add server</button></form>
       <div id="serverPairing" class="server-pairing hidden"></div>
       <div id="serverList" class="server-list"><div class="online-empty">No servers connected yet.</div></div>

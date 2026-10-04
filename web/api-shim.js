@@ -242,12 +242,19 @@
       localUrls.delete(id); return true;
     },
     async saveCloudBook(fileName, bytes, cloudBookId) {
-      if (!browserLibrary()) return { error: 'This browser is connected to a laptop library.' };
-      const library = await localGet('library') || { books: [], folders: [] };
-      if (cloudBookId && (library.books || []).some(book => book.cloudBookId === cloudBookId)) return { alreadyAdded: true, cloudBookId };
-      const saved = await addLocalFile({ name: fileName, blob: new Blob([bytes], { type: localMime(fileName) }) }, fileName);
-      if (saved?.storedPath && cloudBookId) saved.cloudBookId = cloudBookId;
-      return saved;
+      // With no computer to add it to, the browser's own storage is not worth
+      // having: a library only the browser can see is not the library.
+      if (browserLibrary()) return { error: 'This device is not connected to your computer, so the book cannot join your library.' };
+      const params = new URLSearchParams({ name: fileName });
+      if (cloudBookId) params.set('cloudBookId', cloudBookId);
+      const response = await fetch(this.url('/api/book?' + params.toString()), {
+        method: 'POST',
+        headers: Object.assign({ 'content-type': 'application/octet-stream' }, this.headers()),
+        body: bytes
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Your computer would not accept the book.');
+      return data;
     },
     // Saving a cover from the phone writes it back to the laptop, so the same
     // cover shows up in the desktop app.

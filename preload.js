@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   getLibraryDir: () => ipcRenderer.invoke('get-library-dir'),
-  saveCloudBook: (fileName, bytes) => ipcRenderer.invoke('save-cloud-book', { fileName, bytes }),
+  saveCloudBook: (fileName, bytes, cloudBookId) => ipcRenderer.invoke('save-cloud-book', { fileName, bytes, cloudBookId }),
   getCloudSession: () => ipcRenderer.invoke('get-cloud-session'),
   saveCloudSession: (value) => ipcRenderer.invoke('save-cloud-session', value),
   configureCloudAgent: (config) => ipcRenderer.invoke('configure-cloud-agent', config),

@@ -101,13 +101,19 @@
     try { if (session) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(session)); else localStorage.removeItem(ACCOUNT_KEY); } catch {}
   }
   function setPage(page) {
+    // The local library belongs to the app. A browser has no library of its own
+    // to show - books reach the computer over Download - so the online shelf is
+    // the only page there, and asking for the local one lands there instead.
+    if (WEB && page === 'local') page = session ? 'online' : 'landing';
     const library = $('#libraryView'), reader = $('#readerView'), landing = $('#cloudLanding'), online = $('#onlineLibraryView');
     if (reader && !reader.classList.contains('hidden') && page !== 'local' && window.closeReader) window.closeReader();
     library?.classList.toggle('hidden', page !== 'local');
     reader?.classList.toggle('hidden', page !== 'reader');
     landing?.classList.toggle('hidden', page !== 'landing');
     online?.classList.toggle('hidden', page !== 'online');
-    $('#libraryNav')?.classList.toggle('hidden', (hostedLanding && page === 'landing') || page === 'reader');
+    // With the local library gone from the browser there is one page left, so
+    // the switch between two of them has nothing to switch between.
+    $('#libraryNav')?.classList.toggle('hidden', WEB || (hostedLanding && page === 'landing') || page === 'reader');
     $('#searchInput')?.classList.toggle('hidden', page !== 'local');
     $('#btnSettings')?.classList.toggle('hidden', page === 'landing');
     $('#btnAccount')?.classList.toggle('hidden', page === 'landing');
@@ -502,44 +508,9 @@ const data = isSignup
       const extension = ext(book.file_name).toUpperCase();
       card.innerHTML = `<div class="online-book-icon">${book.book_type === 'audio' ? '♫' : book.book_type === 'pdf' ? '▤' : '▧'}</div>
         <div class="online-book-info"><strong title="${esc(book.title || book.file_name)}">${esc(book.title || book.file_name)}</strong><small>${esc(book.author || extension)} · ${humanBytes(book.size_bytes)}</small></div>
-        <div class="online-book-actions"><button type="button" data-action="download">Download</button><button type="button" data-action="delete">Remove</button><button type="button" data-action="instance" ${servers.some(s => s.active) ? '' : 'disabled'}>Create local copy</button></div>`;
+        <div class="online-book-actions"><button type="button" data-action="download">Download</button><button type="button" data-action="delete">Remove</button></div>`;
       card.querySelector('[data-action="download"]').onclick = () => downloadBook(book);
       card.querySelector('[data-action="delete"]').onclick = () => removeBook(book);
-      const makeCopy = card.querySelector('[data-action="instance"]');
-      if (makeCopy) makeCopy.onclick = async () => {
-        makeCopy.disabled = true;
-        const targetServer = $('#targetServerSelect').value;
-        if (!targetServer) { makeCopy.disabled = false; setMessage('#cloudUploadStatus', 'Choose an active server first.', 'bad'); return; }
-        const server = servers.find(item => item.id === targetServer);
-        try {
-          const result = await api(`/servers/${enc(targetServer)}/instances`, { method: 'POST', body: JSON.stringify({ bookId: book.id }) });
-          const jobId = result.job?.id;
-          if (!jobId) throw new Error('The server did not accept the local-copy request.');
-          let browserCopyError = '';
-          if (window.api?.isBrowserLocalLibrary?.()) {
-            try { await addOnlineBookToBrowser(book); }
-            catch (error) { browserCopyError = error.message || 'Could not add the book to this browser.'; }
-          }
-          setMessage('#cloudUploadStatus', `Creating a local copy on ${server?.name || 'the selected server'}…`);
-          const job = await waitForInstance(targetServer, jobId);
-          if (job?.status === 'complete') {
-            window.dispatchEvent(new CustomEvent('sb-cloud-instance-created', { detail: { serverId: targetServer, jobId } }));
-            const local = window.api?.isBrowserLocalLibrary?.();
-            const message = local
-              ? browserCopyError ? `The server copy was created, but this browser could not add it to Local Library: ${browserCopyError}` : `“${book.title || book.file_name}” is now in this browser’s Local Library and on ${server?.name || 'the selected server'}.`
-              : `“${book.title || book.file_name}” was added to ${server?.name || 'the selected server'}’s Local Library.`;
-            setMessage('#cloudUploadStatus', message, browserCopyError ? 'bad' : 'good');
-          } else if (job?.status === 'failed') {
-            const local = window.api?.isBrowserLocalLibrary?.();
-            const prefix = local && !browserCopyError ? 'It was added to this browser’s Local Library. ' : '';
-            setMessage('#cloudUploadStatus', `${prefix}The server could not create its local copy: ${job.result_message || 'please check that computer and retry.'}`, 'bad');
-          } else {
-            setMessage('#cloudUploadStatus', `The local-copy request is still queued on ${server?.name || 'the selected server'}. Keep it running and refresh the library shortly.`, 'good');
-          }
-        }
-        catch (error) { setMessage('#cloudUploadStatus', error.message, 'bad'); }
-        finally { makeCopy.disabled = false; }
-      };
       host.appendChild(card);
     }
   }
@@ -548,12 +519,6 @@ const data = isSignup
     if (!host) return;
     const data = await api('/servers');
     servers = data.servers || [];
-    const select = $('#targetServerSelect');
-    const preferred = localStorage.getItem('sb-cloud-target-server') || select.value;
-    select.replaceChildren(new Option('Choose a server', ''));
-    for (const server of servers.filter(s => s.active)) select.add(new Option(server.name, server.id));
-    if (servers.some(server => server.id === preferred && server.active)) select.value = preferred;
-    select.onchange = () => { if (select.value) localStorage.setItem('sb-cloud-target-server', select.value); };
     host.replaceChildren();
     if (!servers.length) { host.innerHTML = '<div class="online-empty">No servers registered yet. Add a computer that runs Sailing Books.</div>'; return; }
     for (const server of servers) {
@@ -645,40 +610,47 @@ const data = isSignup
     setMessage('#cloudUploadStatus', `${items.length} book${items.length === 1 ? '' : 's'} added to your online library.`, 'good');
     await refreshOnline();
   }
-  async function addOnlineBookToBrowser(book) {
-    const response = await apiFile(`/books/${enc(book.id)}/file`);
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    const saved = await window.api.saveCloudBook(book.file_name, bytes, book.id);
-    if (saved?.alreadyAdded) return saved;
-    if (!saved?.storedPath) throw new Error(saved?.error || 'Could not add the book to this browser’s Local Library.');
-    window.dispatchEvent(new CustomEvent('sb-cloud-book-downloaded', { detail: saved }));
-    return saved;
+  // Hands the file to the browser the ordinary way, for when there is no library
+  // to add it to.
+  function saveFileToDisk(name, bytes) {
+    const blob = new Blob([bytes], { type: mimeFor(name) });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a'); link.href = url; link.download = name; link.style.display = 'none';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   }
-  async function waitForInstance(serverId, jobId) {
-    for (let attempt = 0; attempt < 30; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      const result = await api(`/servers/${enc(serverId)}/instances/${enc(jobId)}`);
-      if (result.job?.status === 'complete' || result.job?.status === 'failed') return result.job;
-    }
-    return null;
-  }
+  /* Download means "into the library", not "onto this machine's disk".
+   *
+   * A book in the online library belongs beside the books already on the
+   * computer, so Download puts it there - in the app, and in a browser that is
+   * paired with the computer too, which is what makes the website and the app
+   * agree. Only a browser with no computer to talk to falls back to saving the
+   * file, and it says so rather than quietly doing something else. */
   async function downloadBook(book) {
     setMessage('#cloudUploadStatus', '');
+    const name = book.file_name || book.title || 'book';
+    let bytes = null;
     try {
       const response = await apiFile(`/books/${enc(book.id)}/file`);
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (!window.api?.mode && window.api?.saveCloudBook) {
-        const saved = await window.api.saveCloudBook(book.file_name, bytes);
-        if (!saved?.storedPath) throw new Error(saved?.error || 'Could not save the book to this computer.');
-        window.dispatchEvent(new CustomEvent('sb-cloud-book-downloaded', { detail: saved }));
-      } else {
-        const blob = new Blob([bytes], { type: mimeFor(book.file_name) });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a'); link.href = url; link.download = book.file_name; link.style.display = 'none';
-        document.body.appendChild(link); link.click(); link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      bytes = new Uint8Array(await response.arrayBuffer());
+      const saved = window.api?.saveCloudBook
+        ? await window.api.saveCloudBook(book.file_name, bytes, book.id)
+        : { error: 'This device cannot add books to a library.' };
+      if (saved?.alreadyAdded) {
+        setMessage('#cloudUploadStatus', `“${name}” is already in your local library.`, 'good');
+        return;
       }
-    } catch (error) { setMessage('#cloudUploadStatus', error.message, 'bad'); }
+      if (!saved?.storedPath) throw new Error(saved?.error || 'Could not add the book to your local library.');
+      window.dispatchEvent(new CustomEvent('sb-cloud-book-downloaded', { detail: saved }));
+      setMessage('#cloudUploadStatus', `“${name}” is now in your local library.`, 'good');
+    } catch (error) {
+      if (bytes) {
+        saveFileToDisk(name, bytes);
+        setMessage('#cloudUploadStatus', `Saved “${name}” as a file instead. ${error.message}`, 'bad');
+      } else {
+        setMessage('#cloudUploadStatus', error.message, 'bad');
+      }
+    }
   }
   async function removeBook(book) {
     if (!confirm(`Remove “${book.title || book.file_name}” from your online library?`)) return;
@@ -728,8 +700,11 @@ const data = isSignup
     // line below from running - leaving a sign-in form that renders but does
     // nothing when pressed. A failed read just means "not signed in".
     session = await sessionRead().catch(() => null);
-    $('#navLocalLibrary').onclick = () => setPage('local');
-    $('#navOnlineLibrary').onclick = () => { if (session) setPage('online'); else setPage('landing'); };
+    if (WEB) setPage(session ? 'online' : 'landing');
+    else {
+      $('#navLocalLibrary').onclick = () => setPage('local');
+      $('#navOnlineLibrary').onclick = () => { if (session) setPage('online'); else setPage('landing'); };
+    }
     $('#btnAccount').onclick = () => { setPage(session ? 'online' : 'landing'); if (!session) showAuthMode(false); };
     $('#cloudAuthToggle').onclick = () => showAuthMode(!isSignup);
     // Finishing setup: the plan is written to the account, and only then does the
@@ -762,15 +737,19 @@ const data = isSignup
       $('#serverName').value = 'This computer';
       $('#serverUrl').value = 'http://localhost:8787';
     }
-    if (hostedLanding) {
+    // In a browser there is no local library to land in, so the online shelf is
+    // the page it opens on, signed in or not.
+    if (hostedLanding || WEB) {
       if (session?.refresh_token) api('/me').then(() => setPage('online')).catch(() => { sessionSave(null); setPage('landing'); });
-      else setPage('landing');
+      else setPage(session ? 'online' : 'landing');
     } else {
       $('#libraryNav').classList.remove('hidden');
       setPage('local');
       if (session?.refresh_token) api('/me').then(refreshOnline).catch(() => sessionSave(null));
     }
-    window.addEventListener('sb-cloud-book-downloaded', () => setPage('local'));
+    // A book arriving in the library is worth going to look at, but only the app
+    // has a local library for it to arrive in.
+    if (!WEB) window.addEventListener('sb-cloud-book-downloaded', () => setPage('local'));
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
 })();

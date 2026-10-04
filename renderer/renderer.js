@@ -1222,11 +1222,6 @@ window.addEventListener('sb-cloud-book-downloaded', async (event) => {
   try { await enrichBook(book); } catch {}
   save(); render();
 });
-window.addEventListener('sb-cloud-instance-created', async () => {
-  if (!WEB || BROWSER_LOCAL) return;
-  try { await hydrateFromServer(); render(); }
-  catch (error) { console.warn('Could not refresh the local library after the server copy completed', error); }
-});
 if (window.api?.onCloudInstanceAdded) {
   window.api.onCloudInstanceAdded((book) => window.dispatchEvent(new CustomEvent('sb-cloud-book-downloaded', { detail: book })));
 }

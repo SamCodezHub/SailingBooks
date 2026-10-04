@@ -122,14 +122,25 @@ app.on('window-all-closed', () => {
 
 ipcMain.handle('get-library-dir', () => libraryDir());
 
-ipcMain.handle('save-cloud-book', async (event, { fileName, bytes }) => {
+ipcMain.handle('save-cloud-book', async (event, { fileName, bytes, cloudBookId }) => {
   try {
     const safeExt = path.extname(String(fileName || '')).toLowerCase();
     if (!['.epub', '.pdf', '.mp3', '.m4a', '.m4b', '.wav', '.ogg', '.opus', '.flac', '.aac'].includes(safeExt)) return { error: 'Unsupported book format' };
+    // Downloading the same book twice should not leave two copies on the shelf.
+    if (cloudBookId) {
+      try {
+        const index = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'library-index.json'), 'utf8'));
+        const prior = (index.books || []).find(b => b.cloudBookId === cloudBookId && b.storedPath && fs.existsSync(b.storedPath));
+        if (prior) return { alreadyAdded: true, fileName: prior.fileName, storedPath: prior.storedPath, size: fs.statSync(prior.storedPath).size };
+      } catch {}
+    }
     const targetName = uniqueTarget(libraryDir(), path.basename(String(fileName)));
     const targetPath = path.join(libraryDir(), targetName);
     fs.writeFileSync(targetPath, Buffer.from(bytes));
-    return { fileName: targetName, storedPath: targetPath, size: fs.statSync(targetPath).size };
+    return {
+      fileName: targetName, storedPath: targetPath, size: fs.statSync(targetPath).size,
+      ...(cloudBookId ? { cloudBookId: String(cloudBookId) } : {})
+    };
   } catch (error) { return { error: String(error && error.message || error) }; }
 });
 

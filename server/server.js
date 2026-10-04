@@ -453,6 +453,31 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true });
     }
     if (p === '/api/ping') return sendJson(res, 200, { ok: true, at: Date.now() });
+    // A book from the online library, saved into this computer's library by the
+    // Download button in the app or in a browser paired with this computer. The
+    // bytes arrive as the request body and the name in the query string.
+    if ((m = /^\/api\/book$/.exec(p)) && req.method === 'POST') {
+      const wanted = url.searchParams.get('name') || '';
+      const cloudBookId = url.searchParams.get('cloudBookId') || '';
+      const title = url.searchParams.get('title') || '';
+      const author = url.searchParams.get('author') || '';
+      if (!wanted) return sendJson(res, 400, { error: 'No file name given' });
+      const already = cloudBookId
+        ? readIndex().books.find(b => b.cloudBookId === cloudBookId && b.storedPath && fs.existsSync(b.storedPath))
+        : null;
+      if (already) return sendJson(res, 200, { alreadyAdded: true, fileName: already.fileName, storedPath: already.storedPath, size: fs.statSync(already.storedPath).size });
+      const stored = await storeLocalBook(req, wanted);
+      try {
+        adoptLocalBook({ ...stored, title, author, cloudBookId });
+      } catch (error) {
+        try { fs.unlinkSync(stored.targetPath); } catch {}
+        throw error;
+      }
+      // The app is usually open. Telling it means the book appears there without
+      // waiting for a restart.
+      process.emit('sb-cloud-instance-added', { fileName: stored.targetName, storedPath: stored.targetPath, size: stored.size });
+      return sendJson(res, 200, { fileName: stored.targetName, storedPath: stored.targetPath, size: stored.size });
+    }
   } catch (e) {
     console.error('api error', p, e);
     return sendJson(res, 500, { error: String(e && e.message || e) });
@@ -471,6 +496,57 @@ function lanAddresses() {
 }
 
 /* ---------------- optional online-library server agent ---------------- */
+/* Take a book that is already sitting in the library folder and give it an entry
+ * in the index, keeping every book and folder that was already there. Shared by
+ * the cloud instance installer and by a browser asking to add a book, so both
+ * land in the library the same way. Returns the record that was added. */
+function adoptLocalBook({ targetPath, title, author, type, cloudBookId, cloudJobId }) {
+  const targetName = path.basename(targetPath);
+  const indexExists = fs.existsSync(INDEX_FILE);
+  const current = readIndex();
+  const existing = current.books.length ? current : scanLibrary();
+  const record = {
+    id: crypto.randomUUID(),
+    title: String(title || path.basename(targetName, path.extname(targetName))).slice(0, 180),
+    author: String(author || '').slice(0, 180),
+    type: type || 'epub',
+    fileName: targetName, storedPath: targetPath, coverPath: null, folderId: null,
+    addedAt: Date.now(), progress: 0, progressSeconds: 0,
+    ...(cloudBookId ? { cloudBookId: String(cloudBookId) } : {}),
+    ...(cloudJobId ? { cloudJobId } : {})
+  };
+  const nextBooks = [...existing.books, record];
+  const nextFolders = existing.folders || [];
+  if (indexExists) {
+    indexCache = { mtime: fs.statSync(INDEX_FILE).mtimeMs, books: nextBooks, folders: nextFolders };
+    writeIndex();
+  } else {
+    fs.writeFileSync(INDEX_FILE, JSON.stringify({ version: 1, updatedAt: Date.now(), books: nextBooks, folders: nextFolders }));
+    indexCache = { mtime: 0, books: nextBooks, folders: nextFolders };
+  }
+  return record;
+}
+// Stream a book into the library folder without ever leaving a half-written file
+// behind, then adopt it. Returns the stored name and size.
+async function storeLocalBook(stream, fileName) {
+  const ext = path.extname(String(fileName || '')).slice(1).toLowerCase();
+  if (!LIB_EXTS.includes(ext)) throw new Error('Unsupported book format');
+  const safeName = path.basename(String(fileName)).replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 180) || `book.${ext}`;
+  const targetName = uniqueLocalTarget(LIBRARY_DIR, safeName);
+  const targetPath = path.join(LIBRARY_DIR, targetName);
+  const tempPath = targetPath + '.download-' + crypto.randomBytes(6).toString('hex');
+  try {
+    await pipeline(stream, fs.createWriteStream(tempPath, { flags: 'wx' }));
+    const stat = fs.statSync(tempPath);
+    if (stat.size < 1 || stat.size > 2 * 1024 * 1024 * 1024) throw new Error('Book has an invalid size');
+    fs.renameSync(tempPath, targetPath);
+    return { targetName, targetPath, size: stat.size };
+  } catch (error) {
+    try { fs.unlinkSync(tempPath); } catch {}
+    throw error;
+  }
+}
+
 async function installCloudInstance(job) {
   if (!job || !job.book || !job.downloadUrl) throw new Error('The cloud job is incomplete');
   const prior = readIndex().books.find(item => item.cloudJobId === job.jobId);
@@ -482,40 +558,20 @@ async function installCloudInstance(job) {
   if (!response.ok || !response.body) throw new Error('Could not download the online book');
   const contentLength = Number(response.headers.get('content-length') || 0);
   if (contentLength > 2 * 1024 * 1024 * 1024) throw new Error('Book is larger than the local-copy limit');
-  const safeName = path.basename(String(book.fileName)).replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').slice(0, 180) || `book.${ext}`;
-  const targetName = uniqueLocalTarget(LIBRARY_DIR, safeName);
-  const targetPath = path.join(LIBRARY_DIR, targetName);
-  const tempPath = targetPath + '.download-' + crypto.randomBytes(6).toString('hex');
+  const { targetName, targetPath, size } = await storeLocalBook(Readable.fromWeb(response.body), book.fileName);
   try {
-    await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(tempPath, { flags: 'wx' }));
-    const stat = fs.statSync(tempPath);
-    if (stat.size < 1 || stat.size > 2 * 1024 * 1024 * 1024) throw new Error('Downloaded book has an invalid size');
-    fs.renameSync(tempPath, targetPath);
-    const indexExists = fs.existsSync(INDEX_FILE);
-    const current = readIndex();
-    const existing = current.books.length ? current : scanLibrary();
-    const record = {
-      id: crypto.randomUUID(), title: String(book.title || path.basename(targetName, path.extname(targetName))).slice(0, 180),
-      author: String(book.author || '').slice(0, 180), type: ext === 'epub' ? 'epub' : ext === 'pdf' ? 'pdf' : 'audio',
-      fileName: targetName, storedPath: targetPath, coverPath: null, folderId: null,
-      addedAt: Date.now(), progress: 0, progressSeconds: 0, cloudJobId: job.jobId
-    };
-    const nextBooks = [...existing.books, record];
-    const nextFolders = existing.folders || [];
-    if (indexExists) {
-      indexCache = { mtime: fs.statSync(INDEX_FILE).mtimeMs, books: nextBooks, folders: nextFolders };
-      writeIndex();
-    } else {
-      fs.writeFileSync(INDEX_FILE, JSON.stringify({ version: 1, updatedAt: Date.now(), books: nextBooks, folders: nextFolders }));
-      indexCache = { mtime: 0, books: nextBooks, folders: nextFolders };
-    }
-    process.emit('sb-cloud-instance-added', { fileName: targetName, storedPath: targetPath, size: stat.size });
-    return targetName;
+    adoptLocalBook({
+      targetPath,
+      title: book.title, author: book.author,
+      type: ext === 'epub' ? 'epub' : ext === 'pdf' ? 'pdf' : 'audio',
+      cloudJobId: job.jobId
+    });
   } catch (error) {
-    try { fs.unlinkSync(tempPath); } catch {}
     try { fs.unlinkSync(targetPath); } catch {}
     throw error;
   }
+  process.emit('sb-cloud-instance-added', { fileName: targetName, storedPath: targetPath, size });
+  return targetName;
 }
 function uniqueLocalTarget(dir, fileName) {
   const ext = path.extname(fileName), base = path.basename(fileName, ext);
