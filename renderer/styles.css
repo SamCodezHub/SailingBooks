@@ -1039,3 +1039,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   .online-upload { align-items:flex-start; flex-direction:column; }
   .server-register { grid-template-columns:1fr; }
 }
+
+/* Phones: the bar runs out of room long before the desktop does. Mark, name,
+   plan badge and gear want about 200px, and the two library tabs and the search
+   field want about 260 more - which is more than a phone is wide. So the bar
+   becomes two rows: who you are on the first, where you are going on the second.
+   Nothing above this width is touched. */
+@media (max-width:560px) {
+  #topbar {
+    display: grid;
+    grid-template-columns: auto minmax(0,1fr) auto;
+    grid-template-areas: "brand account gear" "nav nav search";
+    align-items: center;
+    justify-items: start;
+    gap: 7px 10px;
+    padding: 8px 12px;
+    min-height: 0;
+  }
+  .topbar-brand { grid-area: brand; }
+  #libraryNav { grid-area: nav; }
+  /* The gear was taken out of the flow to sit in the corner, which is what it
+     would still do here - across both rows, in the middle of the screen. */
+  #btnSettings {
+    grid-area: gear; position: static; transform: none;
+    justify-self: end; align-self: center;
+    width:32px; height:32px;
+  }
+  .account-group { grid-area: account; justify-self: end; margin-right:0; gap:6px; }
+  #searchInput { grid-area: search; justify-self: end; width:min(190px, 46vw); margin:0; }
+  .topbar-brand { align-self: center; }
+}

@@ -24,8 +24,12 @@ let html = read(path.join(ROOT, 'renderer', 'index.html'));
 const gate = read(path.join(__dirname, 'login.html'));
 html = html.replace('<div id="app">', gate + '\n<div id="app">');
 html = html.replace(/<script src="renderer\.js"><\/script>/,
-  '<script src="api-shim.js"></script>\n<script src="login.js"></script>\n<script src="renderer.js"></script>');
-fs.writeFileSync(path.join(OUT, 'index.html'), html);
+    '<script src="api-shim.js"></script>\n<script src="login.js"></script>\n<script src="renderer.js"></script>');
+  // The app runs from renderer/, so it reaches the icon in ../assets/. This copy
+  // sits at the root of the site, where that would point outside it and leave a
+  // broken image where the brand mark should be.
+  html = html.replace(/\.\.\/assets\//g, 'assets/');
+  fs.writeFileSync(path.join(OUT, 'index.html'), html);
 
 fs.writeFileSync(path.join(OUT, 'styles.css'), read(path.join(ROOT, 'renderer', 'styles.css')));
 fs.writeFileSync(path.join(OUT, 'renderer.js'), read(path.join(ROOT, 'renderer', 'renderer.js')));

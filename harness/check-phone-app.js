@@ -58,7 +58,18 @@ const REPORT = `JSON.stringify((() => {
     onlineTabUp: visible('navOnlineLibrary'),
     actions: card ? [...card.querySelectorAll('.online-book-actions button')].map(b => b.textContent.trim()) : [],
     status: (document.getElementById('cloudUploadStatus') || {}).textContent || '',
-    localTitles: [...document.querySelectorAll('#libraryView .book-title, #libraryView .shelf-title')].map(e => e.textContent.trim()).filter(Boolean).slice(0, 6)
+    localTitles: [...document.querySelectorAll('#libraryView .book-title, #libraryView .shelf-title')].map(e => e.textContent.trim()).filter(Boolean).slice(0, 6),
+    // A phone is where the bar runs out of room, so measure that it fits.
+    bar: (() => {
+      const r = id => { const e = document.getElementById(id); if (!e || !e.getClientRects().length) return null;
+        const b = e.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom) }; };
+      return {
+        height: Math.round(document.getElementById('topbar').getBoundingClientRect().height),
+        width: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        name: r('btnAccount'), pill: r('accountPlanPill'), gear: r('btnSettings'), nav: r('libraryNav'), search: r('searchInput')
+      };
+    })()
   };
 })())`;
 
@@ -91,6 +102,18 @@ app.whenReady().then(async () => {
   check(r.localUp === true, 'it opens on the local library, like the desktop app', 'localUp=' + r.localUp);
   check(r.navUp === true, 'and offers both places to go', 'navUp=' + r.navUp);
   check(r.localTabUp === true && r.onlineTabUp === true, 'Local Library and Online Library', 'local=' + r.localTabUp + ' online=' + r.onlineTabUp);
+
+  say('\n  the bar fits a phone\n');
+  const bar = r.bar;
+  const fits = bar.scrollWidth <= bar.width + 1;
+  check(fits, 'the page does not scroll sideways', bar.scrollWidth + 'px of content in ' + bar.width + 'px');
+  check(bar.name && bar.gear && bar.name.r <= bar.gear.l,
+    'and the name does not sit under the gear',
+    bar.name && bar.gear ? 'name ends ' + bar.name.r + ', gear starts ' + bar.gear.l : 'missing');
+  const rows = bar.name && bar.nav ? (bar.name.t < bar.nav.t ? 'two' : 'one') : '?';
+  check(bar.height <= 110, 'and the bar is not taller than it needs to be', bar.height + 'px, ' + rows + ' rows');
+  check(bar.search && bar.search.r <= bar.width, 'the search field is on the screen too',
+    bar.search ? bar.search.l + '..' + bar.search.r : 'not shown');
 
   say('\n  downloading puts the book in it\n');
   await win.webContents.executeJavaScript(`(() => {
@@ -126,6 +149,20 @@ app.whenReady().then(async () => {
   await win.webContents.executeJavaScript(`(() => { document.querySelector('.online-book-card [data-action="download"]').click(); return 1; })()`);
   r = await waitFor(win, s => /already in your local library|as a file/i.test(s.status), 40);
   check(/already in your local library/i.test(r.status), 'the second press is told it is already there', r.status);
+
+  say('\n  and the bar still fits with the name and the plan badge showing\n');
+  r = JSON.parse(await win.webContents.executeJavaScript(REPORT));
+  const bar2 = r.bar;
+  check(!!bar2.pill, 'the plan badge is there', bar2.pill ? bar2.pill.l + '..' + bar2.pill.r : 'not shown');
+  check(bar2.pill && bar2.pill.r <= bar2.width, 'and is on the screen rather than past the edge',
+    bar2.pill ? bar2.pill.l + '..' + bar2.pill.r + ' of ' + bar2.width : 'not shown');
+  check(bar2.name && bar2.pill && bar2.name.r <= bar2.pill.l, 'beside the name, not on it',
+    bar2.name && bar2.pill ? 'name ends ' + bar2.name.r + ', badge starts ' + bar2.pill.l : 'missing');
+  check(bar2.pill && bar2.gear && bar2.pill.r <= bar2.gear.l, 'and clear of the gear',
+    bar2.pill && bar2.gear ? 'badge ends ' + bar2.pill.r + ', gear starts ' + bar2.gear.l : 'missing');
+  check(bar2.scrollWidth <= bar2.width + 1, 'and the page still does not scroll sideways',
+    bar2.scrollWidth + 'px of content in ' + bar2.width + 'px');
+  check(bar2.height <= 110, 'with the bar no taller than it needs to be', bar2.height + 'px');
 
   try { fs.rmSync(profile, { recursive: true, force: true }); } catch {}
   say('');
