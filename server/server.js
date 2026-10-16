@@ -325,6 +325,10 @@ async function serveClient(res, urlPath) {
     '/api-shim.js': SHIM,
     '/login.js': path.join(ROOT, 'web', 'login.js'),
     '/cloud-client.js': CLOUD_CLIENT,
+    // The brand mark. The page asks for it as ../assets/..., which a browser at
+    // the root resolves to /assets/ - without this it is a broken image on the
+    // phone and on the desktop browser.
+    '/assets/icon-header.png': path.join(ROOT, 'assets', 'icon-header.png'),
     '/node_modules/jszip/dist/jszip.min.js': path.join(ROOT, 'node_modules', 'jszip', 'dist', 'jszip.min.js'),
     '/node_modules/pdfjs-dist/build/pdf.js': path.join(ROOT, 'node_modules', 'pdfjs-dist', 'build', 'pdf.js'),
     '/node_modules/pdfjs-dist/build/pdf.worker.js': path.join(ROOT, 'node_modules', 'pdfjs-dist', 'build', 'pdf.worker.js')
