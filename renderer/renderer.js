@@ -2807,27 +2807,39 @@ function render() {
   // books
   const list = filteredBooks();
   if (!cur) {
-    // Unified shelf: folders and loose books as one tile grid.
+    // Two headings: folders first, then every book that is not in one.
     $('#shelfSection').style.display = '';
     $('#booksSection').style.display = 'none';
     const q = state.search.trim().toLowerCase();
-    $('#shelfTitle').textContent = q ? 'Folders & Books · results' : 'Folders & Books';
+    const searching = !!q;
+    const emptyLib = state.books.length === 0 && state.folders.length === 0 && !q;
+    $('#emptyState').style.display = emptyLib ? '' : 'none';
+
     const shelf = $('#shelfGrid');
     shelf.innerHTML = '';
-    $('#emptyState').style.display = (state.books.length === 0 && state.folders.length === 0 && !q) ? '' : 'none';
     const folders = [...state.folders].sort((a, b) => a.name.localeCompare(b.name))
       .filter(f => !q || f.name.toLowerCase().includes(q));
     folders.forEach(f => shelf.appendChild(folderTile(f)));
-    let loose = q
+    $('#shelfTitle').textContent = searching ? 'Folders · results' : 'Folders';
+    $('#shelfTitle').classList.toggle('hidden', emptyLib || !folders.length);
+    shelf.style.display = folders.length ? '' : 'none';
+
+    const looseGrid = $('#looseGrid');
+    looseGrid.innerHTML = '';
+    const loose = searching
       ? state.books.filter(b => (b.title + ' ' + (b.author || '') + ' ' + b.fileName).toLowerCase().includes(q))
       : state.books.filter(b => !b.folderId);
     loose.sort((a, b) => (b.lastOpened || 0) - (a.lastOpened || 0) || b.addedAt - a.addedAt);
-    loose.forEach(b => shelf.appendChild(bookTile(b)));
-    if ((q && !folders.length && !loose.length)) {
-      shelf.innerHTML = `<div style="color:#bbb;font-size:13px;padding:6px 2px;">No matches.</div>`;
+    loose.forEach(b => looseGrid.appendChild(bookTile(b)));
+    const noMatches = searching && !folders.length && !loose.length;
+    $('#looseTitle').textContent = searching ? 'Unsorted books · results' : 'Unsorted books';
+    $('#looseSection').style.display = (loose.length || noMatches) ? '' : 'none';
+    if (noMatches) {
+      looseGrid.innerHTML = `<div style="color:#bbb;font-size:13px;padding:6px 2px;">No matches.</div>`;
     }
   } else {
     $('#shelfSection').style.display = 'none';
+    $('#looseSection').style.display = 'none';
     $('#booksSection').style.display = '';
     $('#booksTitle').textContent = `Books in “${cur.name}”`;
     const grid = $('#booksGrid');

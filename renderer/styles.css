@@ -227,6 +227,7 @@ body {
 .shelf-heading .section-title { margin-right:auto; }
 
 #shelfGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+#looseGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 .folder-card {
   border: 1px solid var(--line); border-radius: var(--radius);
   padding: 14px 14px 12px 18px; background: var(--panel); cursor: pointer;
@@ -899,14 +900,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 @keyframes modalIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 @keyframes drawerIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
 @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
-#shelfGrid > :nth-child(-n+8), #booksGrid > :nth-child(-n+8) { animation: tileEnter .34s var(--ease-ui) both; }
-#shelfGrid > :nth-child(2), #booksGrid > :nth-child(2) { animation-delay: 25ms; }
-#shelfGrid > :nth-child(3), #booksGrid > :nth-child(3) { animation-delay: 50ms; }
-#shelfGrid > :nth-child(4), #booksGrid > :nth-child(4) { animation-delay: 75ms; }
-#shelfGrid > :nth-child(5), #booksGrid > :nth-child(5) { animation-delay: 100ms; }
-#shelfGrid > :nth-child(6), #booksGrid > :nth-child(6) { animation-delay: 125ms; }
-#shelfGrid > :nth-child(7), #booksGrid > :nth-child(7) { animation-delay: 150ms; }
-#shelfGrid > :nth-child(8), #booksGrid > :nth-child(8) { animation-delay: 175ms; }
+#shelfGrid > :nth-child(-n+8), #looseGrid > :nth-child(-n+8), #booksGrid > :nth-child(-n+8) { animation: tileEnter .34s var(--ease-ui) both; }
+#shelfGrid > :nth-child(2), #looseGrid > :nth-child(2), #booksGrid > :nth-child(2) { animation-delay: 25ms; }
+#shelfGrid > :nth-child(3), #looseGrid > :nth-child(3), #booksGrid > :nth-child(3) { animation-delay: 50ms; }
+#shelfGrid > :nth-child(4), #looseGrid > :nth-child(4), #booksGrid > :nth-child(4) { animation-delay: 75ms; }
+#shelfGrid > :nth-child(5), #looseGrid > :nth-child(5), #booksGrid > :nth-child(5) { animation-delay: 100ms; }
+#shelfGrid > :nth-child(6), #looseGrid > :nth-child(6), #booksGrid > :nth-child(6) { animation-delay: 125ms; }
+#shelfGrid > :nth-child(7), #looseGrid > :nth-child(7), #booksGrid > :nth-child(7) { animation-delay: 150ms; }
+#shelfGrid > :nth-child(8), #looseGrid > :nth-child(8), #booksGrid > :nth-child(8) { animation-delay: 175ms; }
 @keyframes tileEnter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--edge); border: 3px solid transparent; border-radius: 99px; background-clip: padding-box; }

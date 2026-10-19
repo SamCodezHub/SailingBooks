@@ -12,7 +12,7 @@ Local-first library and reader for EPUBs, PDFs and audiobooks, with a matching b
 - Audiobook player: play/pause, seek, −15s/+30s, speed, position saved
 - Fullscreen reading: ⛶ Full button in the reader or F11 (Esc exits)
 - Reading flowchart per folder: books on top, free node chart below — drag a book in to make a node, drag nodes to arrange, scroll to zoom (positions stay), drag empty space to pan, click one then another to connect (many-to-many), right-drag over nodes to group a named + colored section, double-click renames, right-click links books / deletes
-- Empty-canvas library: one unified "Folders & Books" shelf — folders (color bar, no clutter) and single-book tiles side by side, all draggable
+- Empty-canvas library: folders listed under a "Folders" heading, then every book not in a folder under "Unsorted books" — folders keep a colour bar and single-book tiles, all draggable
 - Folders: rename, color-code, delete (books move to Unsorted)
 - Double-click a book → read / listen view
 - Right-click book / folder / empty space → Rename, Move, Color, Delete
