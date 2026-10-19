@@ -928,7 +928,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .nav-tab { border:0; border-radius:999px; padding:7px 11px; color:var(--muted); background:transparent; font-family:var(--font-ui); font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:background .18s ease,color .18s ease,transform .18s var(--ease-spring); }
 .nav-tab:hover { color:var(--ink); transform:translateY(-1px); }
 .nav-tab.active { color:var(--ink); background:var(--panel); box-shadow:var(--shadow); }
-#searchInput { margin:0 auto; }
+#searchInput { margin-right: calc(22px + var(--caption-reserve)); }
 /* The gear is taken out of the flow and pinned to the right edge, so the
    account and its plan badge are wrapped together and that gap is reserved
    once, for both. Putting the badge outside this used to push it under the
@@ -958,7 +958,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   -webkit-app-region: no-drag; app-region: no-drag;
 }
 #topbar { padding-right: calc(22px + var(--caption-reserve)); }
-.account-group { margin-right: calc(58px + var(--caption-reserve)); }
+.account-group { margin-right: 16px; }
 #btnSettings { right: calc(14px + var(--caption-reserve)); }
 #readerBar { padding-right: calc(20px + var(--caption-reserve)); min-height: 62px; box-sizing: border-box; }
 /* The drawer opens over the top-right corner, where the window buttons are, so

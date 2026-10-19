@@ -90,17 +90,21 @@ const BAR_RIGHT = `JSON.stringify((() => {
   const gear = document.getElementById('btnSettings');
   const name = document.getElementById('btnAccount');
   const pill = document.getElementById('accountPlanPill');
-  const g = box(gear), n = box(name), p = box(pill);
+  const search = document.getElementById('searchInput');
+  const g = box(gear), n = box(name), p = box(pill), s = box(search);
   return {
     reserve: Math.round(reserve),
     barRight: Math.round(bar.right),
     stripLeft: Math.round(bar.right - reserve),
-    gear: g, name: n, pill: p,
+    gear: g, name: n, pill: p, search: s,
     gearInStrip: g.r > bar.right - reserve + 1,
     pillInStrip: p.r > bar.right - reserve + 1,
     nameInStrip: n.r > bar.right - reserve + 1,
     gapPillGear: g.l - p.r,
-    gapNamePill: p.l - n.r
+    gapNamePill: p.l - n.r,
+    gapPillSearch: s.l - p.r,
+    accountLeftOfSearch: p.r <= s.l,
+    searchLeftOfGear: s.r <= g.l
   };
 })())`;
 
@@ -183,6 +187,8 @@ app.whenReady().then(async () => {
   check(!acct.gearInStrip, 'and the gear is clear of them', 'gear ends ' + acct.gear.r + ', strip starts ' + acct.stripLeft);
   check(acct.gapPillGear >= 6, 'with room between the plan and the gear', acct.gapPillGear + 'px between them');
   check(acct.gapNamePill >= 4, 'and between the name and the plan', acct.gapNamePill + 'px');
+  check(acct.accountLeftOfSearch, 'account is immediately left of the search', 'account ends ' + acct.pill.r + ', search starts ' + acct.search.l);
+  check(acct.searchLeftOfGear, 'search is left of the window buttons', 'search ends ' + acct.search.r + ', gear starts ' + acct.gear.l);
 
   say('\n  and neither does the settings drawer\n');
   const drawer = JSON.parse(await win.webContents.executeJavaScript(DRAWER));
