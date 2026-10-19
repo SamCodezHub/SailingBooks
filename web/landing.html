@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Sailing Books</title>
+<meta name="description" content="A private shelf for your books. Read EPUB, PDF and audiobooks on your computer and your phone. Your files stay yours." />
+<meta name="theme-color" content="#ffffff" />
+<link rel="icon" href="assets/icon-header.png" />
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --soft: #f4f2ee;
+    --ink: #1b1a18;
+    --strong: #111110;
+    --muted: #6b6862;
+    --line: #e7e3dc;
+    --accent: #1b1a18;
+    --on-accent: #ffffff;
+    --focus: #2b7fff;
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 12px 32px rgba(0,0,0,.07);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px; }
+
+  header { display: flex; align-items: center; gap: 12px; padding: 26px 0; }
+  .mark { width: 40px; height: 40px; border-radius: 11px; display: block; }
+  .name { font-weight: 700; letter-spacing: -.02em; font-size: 17px; }
+  .tag { color: var(--muted); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; margin-left: auto; }
+
+  main { padding: 40px 0 80px; }
+  h1 {
+    margin: 0 0 18px; font-size: clamp(38px, 7vw, 68px); line-height: 1.02;
+    letter-spacing: -.045em; font-weight: 750; color: var(--strong);
+  }
+  .lead { margin: 0 0 14px; font-size: clamp(17px, 2.2vw, 21px); color: var(--muted); max-width: 34em; }
+
+  .downloads { display: flex; flex-wrap: wrap; gap: 14px; margin: 34px 0 14px; }
+  .dl {
+    display: flex; align-items: center; gap: 14px; text-decoration: none; color: inherit;
+    border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel);
+    padding: 16px 22px 16px 18px; box-shadow: var(--shadow); min-width: 264px;
+    transition: transform .18s ease, border-color .18s ease;
+  }
+  .dl:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .dl:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .dl .glyph {
+    flex: none; width: 42px; height: 42px; border-radius: 11px; background: var(--accent);
+    color: var(--on-accent); display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 800;
+  }
+  .dl b { display: block; font-size: 15.5px; letter-spacing: -.01em; }
+  .dl span { display: block; font-size: 12.5px; color: var(--muted); }
+  .dl .soon { opacity: .5; cursor: default; }
+  .dl .soon:hover { transform: none; border-color: var(--line); }
+  .note { font-size: 13px; color: var(--muted); margin: 0 0 40px; }
+
+  .points { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .point { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: 20px; }
+  .point h3 { margin: 0 0 6px; font-size: 14.5px; letter-spacing: -.01em; }
+  .point p { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+  .strip {
+    display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 40px 0 0; padding: 20px 0 0;
+    border-top: 1px solid var(--line); font-size: 13px; color: var(--muted);
+  }
+  .strip span::before { content: "\2713"; margin-right: 8px; color: var(--accent); font-weight: 700; }
+
+  footer { padding: 30px 0 60px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 560px) {
+    header { padding: 18px 0; }
+    main { padding: 26px 0 60px; }
+    .dl { width: 100%; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <img class="mark" src="assets/icon-header.png" alt="" />
+      <div class="name">Sailing Books</div>
+      <div class="tag">__VERSION__</div>
+    </header>
+
+    <main>
+      <h1>A quieter place for your next chapter.</h1>
+      <p class="lead">A private shelf for EPUB, PDF and audiobooks. Read on your computer, keep reading on your phone, and send a book to any machine you trust.</p>
+
+<div class="downloads">
+        __APK_ITEM__
+        __EXE_ITEM__
+      </div>
+      <p class="note">__NOTE__</p>
+
+      <div class="points">
+        <div class="point">
+          <h3>Your books stay yours</h3>
+          <p>No accounts required to read, no catalogue, nothing to log in to. Your shelf is a folder on your own machine.</p>
+        </div>
+        <div class="point">
+          <h3>Every format you own</h3>
+          <p>EPUB with chapters and a table of contents, PDF with page numbers remembered, and audiobooks that pick up where you left off.</p>
+        </div>
+        <div class="point">
+          <h3>Pick up on any screen</h3>
+          <p>Read on the laptop, or hand the phone a link to the same library over your own network. Nothing goes through anyone else's server.</p>
+        </div>
+        <div class="point">
+          <h3>Set how it looks</h3>
+          <p>Nine themes, your own type size and leading, and clean reading with the furniture out of the way.</p>
+        </div>
+      </div>
+
+      <div class="strip">
+        <span>EPUB</span><span>PDF</span><span>Audiobooks</span><span>Chapters and a table of contents</span><span>Nine themes</span><span>Keyboard shortcuts</span>
+      </div>
+    </main>
+
+    <footer>
+      Sailing Books __VERSION__ &middot; <a href="app/">Open the library in a browser</a>
+    </footer>
+  </div>
+</body>
+</html>

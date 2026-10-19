@@ -47,3 +47,6 @@ android/app/src/main/assets/capacitor.plugins.json
 android/capacitor-cordova-android-plugins/
 
 .env*
+
+# built website (the deployment output; web/dist is what the phone app bundles)
+web/site/
