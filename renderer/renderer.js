@@ -2148,26 +2148,52 @@ async function refreshMissingChapters(limit = 15) {
 
 /* ---------- reader ---------- */
 /* ---------- themes & settings ---------- */
-/* Each theme is three colours the picker previews, and a matching data-theme
-   name that the stylesheet turns into the full palette. The names and swatches
-   live here so the picker and the CSS cannot drift apart. */
-const THEMES = [
-  { id: 'light', name: 'Light', sw: ['#ffffff', '#f7f7f7', '#1a1a1a'] },
-  { id: 'paper', name: 'Paper', sw: ['#f6efe1', '#efe6d5', '#3b3226'] },
-  { id: 'solar', name: 'Solar', sw: ['#fdf6e3', '#eee8d5', '#268bd2'] },
-  { id: 'mono', name: 'Mono', sw: ['#f2f2f2', '#e9e9e9', '#1c1c1c'] },
-  { id: 'midnight', name: 'Midnight', sw: ['#14161d', '#22242e', '#6d8cff'] },
-  { id: 'dusk', name: 'Dusk', sw: ['#191526', '#262036', '#b388ff'] },
-  { id: 'ocean', name: 'Ocean', sw: ['#07222b', '#0f303c', '#2dd4bf'] },
-  { id: 'forest', name: 'Forest', sw: ['#101a13', '#1b2820', '#86c06a'] },
-  { id: 'ink', name: 'Ink', sw: ['#000000', '#141418', '#ffd166'] }
-];
+/* The colours and the background behind them are two separate choices now, and
+ * both lists live in themes.js - see the note there about why. */
+const THEMES = window.SB_THEMES || [];
+const BACKGROUNDS = window.SB_BACKGROUNDS || [];
 const THEME_IDS = THEMES.map(t => t.id);
 
 function applyTheme(name) {
-  const id = THEME_IDS.includes(name) ? name : 'light';
-  state.settings.theme = id;
-  document.documentElement.setAttribute('data-theme', id);
+  const theme = window.SB_findTheme?.(name) || THEMES[0];
+  if (!theme) return;
+  state.settings.theme = theme.id;
+  document.documentElement.setAttribute('data-theme', theme.id);
+  // The palette is written straight onto the document, so a theme is one
+  // object rather than a block of CSS per name - and there are a couple of
+  // hundred of them.
+  for (const [prop, value] of Object.entries(theme.vars || {})) {
+    document.documentElement.style.setProperty(prop, value);
+  }
+  syncThemeColor();
+}
+
+function applyBackground(name) {
+  const bg = window.SB_findBackground?.(name) || BACKGROUNDS[0];
+  if (!bg) return;
+  state.settings.background = bg.id;
+  document.documentElement.setAttribute('data-background', bg.id);
+  const style = document.documentElement.style;
+  style.setProperty('--sb-bg', bg.css);
+  style.setProperty('--sb-bg-size', bg.size || 'auto');
+  // Two tones taken from the palette itself, so the pattern is never a fixed
+  // grey that sits wrongly on a light or a dark theme.
+  const vars = (window.SB_findTheme?.(state.settings.theme) || {}).vars || {};
+  const bg1 = vars['--bg'] || '#ffffff';
+  const ink1 = vars['--ink'] || '#000000';
+  const dark = (window.SB_contrast?.(bg1, ink1) || 21) > 4.5;
+  style.setProperty('--sb-line', mixHex(bg1, ink1, dark ? 0.055 : 0.045));
+  style.setProperty('--sb-glow', mixHex(bg1, ink1, dark ? 0.10 : 0.05));
+}
+function mixHex(a, b, t) {
+  const p = c => { const s = String(c).replace('#', ''); const n = s.length === 3 ? s.split('').map(x => x + x).join('') : s;
+    return [0, 2, 4].map(i => parseInt(n.slice(i, i + 2), 16)); };
+  const [r1, g1, b1] = p(a), [r2, g2, b2] = p(b);
+  const out = [r1, g1, b1].map((v, i) => Math.round(v + ([r2, g2, b2][i] - v) * t));
+  return '#' + out.map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function syncThemeColor() {
   // Keep the phone's browser chrome in step with the page, so the address bar
   // does not stay bright white over a dark theme.
   const meta = document.querySelector('meta[name="theme-color"]');
@@ -2195,32 +2221,77 @@ function enterView(view) {
   }, { once: true });
 }
 
+/* The picker: a search box, then the colours, then the backgrounds. A couple of
+ * hundred themes is too many to look at at once, and too many to scroll past. */
 function buildThemeGrid() {
   const grid = $('#themeGrid');
   if (!grid) return;
-  grid.innerHTML = '';
-  for (const t of THEMES) {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'theme-card' + (state.settings.theme === t.id ? ' active' : '');
-    card.title = t.name + ' theme';
-    card.setAttribute('aria-label', t.name + ' theme');
-    card.setAttribute('aria-pressed', String(state.settings.theme === t.id));
-    card.innerHTML =
+  const query = ($('#themeSearch')?.value || '').trim().toLowerCase();
+  const matches = item => !query || item.name.toLowerCase().includes(query);
+  const pick = (list, selectedId, kind, swatches) => list.filter(matches).map(item => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'theme-card' + (selectedId === item.id ? ' active' : '');
+    row.dataset.kind = kind;
+    row.dataset.id = item.id;
+    row.title = item.name;
+    row.setAttribute('aria-label', item.name + ' ' + kind);
+    row.setAttribute('aria-pressed', String(selectedId === item.id));
+    row.innerHTML =
+      '<span class="theme-name">' + escapeHtml(item.name) + '</span>' +
       '<span class="theme-swatches">' +
-        t.sw.map(c => `<i style="background:${c}"></i>`).join('') +
-      '</span><span class="theme-name">' + escapeHtml(t.name) + '</span>';
-    card.onclick = () => {
-      applyTheme(t.id);
+        swatches(item).map(c => `<i style="background:${c}"></i>`).join('') +
+      '</span>';
+    row.onclick = () => {
+      if (kind === 'color') { applyTheme(item.id); applyBackground(state.settings.background); }
+      else applyBackground(item.id);
       save();
       buildThemeGrid();
     };
-    grid.appendChild(card);
+    return row;
+  });
+
+  grid.innerHTML = '';
+  const groups = [
+    { key: 'color', label: 'Colors', list: THEMES, selected: state.settings.theme, sw: t => t.sw },
+    { key: 'background', label: 'Backgrounds', list: BACKGROUNDS, selected: state.settings.background, sw: b => ['var(--swatch-a)', 'var(--swatch-b)'] }
+  ];
+  let shown = 0;
+  for (const g of groups) {
+    const rows = pick(g.list, g.selected, g.key, g.sw);
+    if (!rows.length) continue;
+    shown += rows.length;
+    const head = document.createElement('div');
+    head.className = 'theme-group';
+    head.textContent = g.label + (rows.length < g.list.length ? ' (' + rows.length + ' of ' + g.list.length + ')' : '');
+    grid.appendChild(head);
+    for (const row of rows) grid.appendChild(row);
+  }
+  if (!shown) {
+    const none = document.createElement('div');
+    none.className = 'theme-empty';
+    none.textContent = 'Nothing called “' + ($('#themeSearch')?.value || '') + '”.';
+    grid.appendChild(none);
+  }
+  const count = $('#themeCount');
+  if (count) {
+    const total = THEMES.length + BACKGROUNDS.length;
+    count.textContent = query ? shown + ' of ' + total : total + ' choices';
   }
 }
 
+/* A handle on the two lists and the two functions that apply them. The checks
+ * drive these directly rather than clicking through a couple of hundred rows to
+ * confirm every palette is readable, and it is handy in the console. */
+window.SB_ui = { applyTheme, applyBackground, themes: THEMES, backgrounds: BACKGROUNDS, buildThemeGrid };
+
 function syncSettingsUI() {
-  buildThemeGrid();
+  buildThemeGrid();  const search = $('#themeSearch');
+  if (search && !search.dataset.wired) {
+    search.dataset.wired = '1';
+    search.addEventListener('input', buildThemeGrid);
+    search.addEventListener('keydown', (e) => { if (e.key === 'Escape') { search.value = ''; buildThemeGrid(); } });
+  }
   const size = $('#setFontSize');
   if (size) size.textContent = state.settings.fontSize + 'px';
   const fam = $('#setFontFamily');
@@ -3016,9 +3087,11 @@ load();
 // Apply the saved theme before the first paint, so a dark theme never flashes
 // white on the way in.
 applyTheme(state.settings.theme);
+applyBackground(state.settings.background);
 function startApp() {
   if (!state.settings) state.settings = { fontSize: 18, fontFamily: "Georgia, 'Times Roman', serif", lineHeight: '1.7', theme: 'light' };
   if (!state.settings.theme) state.settings.theme = 'light';
+  if (!state.settings.background) state.settings.background = 'plain';
   if (typeof state.settings.pdfZoom !== 'number') state.settings.pdfZoom = 1;
   pdfZoom = state.settings.pdfZoom;
   if (!state.settings.readMode) state.settings.readMode = 'scroll'; // 'scroll' | 'pages' (epub)

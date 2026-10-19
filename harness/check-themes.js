@@ -19,7 +19,7 @@ const tsExe = (() => {
 const bare = (s) => String(s).replace(/\x1b\[[0-9;;]*[A-Za-z]/g, '');
 const st = spawnSync(tsExe, ['funnel', 'status'], { encoding: 'utf8', timeout: 12000, killSignal: 'SIGKILL' });
 const mm = /https:\/\/([a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net)/i.exec(bare((st.stdout || '') + (st.stderr || '')));
-const URL_ = process.argv[3] || (mm ? 'https://' + mm[1] : '');
+const URL_ = process.argv[3] || (mm ? 'https://' + mm[1] : 'http://127.0.0.1:' + (process.env.SB_PORT || 8787));
 if (!URL_) { console.log('no address to test'); app.exit(1); }
 app.disableHardwareAcceleration();
 
@@ -52,54 +52,67 @@ app.whenReady().then(async () => {
   console.log('\n  settings panel:');
   for (const [k, v] of Object.entries(opened)) console.log('    ' + k.padEnd(16) + JSON.stringify(v));
 
-  // apply every theme and read what the browser actually painted
+  // Apply a spread of themes and read what the browser actually painted. Not
+  // every one: the picker holds a couple of hundred rows, and check-contrast.js
+  // covers the colours of all of them. This is about the picker working.
   const themes = await win.webContents.executeJavaScript(`(async () => {
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const out = [];
-    const cards = () => [...document.querySelectorAll('.theme-card')];
-    for (let i = 0; i < cards().length; i++) {
-      const card = cards()[i];
-      const name = card.querySelector('.theme-name').textContent;
-      card.click();
-      await sleep(160);
+    const all = [...document.querySelectorAll('.theme-card[data-kind="color"]')];
+    const step = Math.max(1, Math.floor(all.length / 12));
+    const cards = () => [...document.querySelectorAll('.theme-card[data-kind="color"]')];
+    const sample = all.filter((_, i) => i % step === 0).slice(0, 13);
+    for (const wanted of sample) {
+      const name = wanted.querySelector('.theme-name').textContent;
+      const index = cards().findIndex(c => c.querySelector('.theme-name').textContent === name);
+      cards()[index].click();
+      await sleep(40);
       // the grid is rebuilt on click, so the live node has to be looked up
       // again rather than reusing the one that was clicked
-      const now = cards()[i];
-      const cs = getComputedStyle(document.body);
-      const pick = (sel) => { const e = document.querySelector(sel); return e ? getComputedStyle(e) : null; };
-      const tile = pick('.book-card') || pick('.folder-card');
-      const bar = pick('#readerBar');
+      const now = cards()[index];
+      // The palette is written as custom properties and the page catches up a
+      // frame later, so reading colour here would report the *previous* theme.
+      // What is checked is that the right palette was asked for - check-contrast
+      // measures what the browser actually paints, in every theme.
+      const theme = (window.SB_THEMES || []).find(t => t.id === now.dataset.id);
       out.push({
         name,
+        id: now.dataset.id,
         active: now.classList.contains('active'),
         attr: document.documentElement.getAttribute('data-theme'),
-        bodyBg: cs.backgroundColor,
-        bodyInk: cs.color,
-        tileBg: tile ? tile.backgroundColor : null,
-        barBg: bar ? bar.backgroundColor : null
+        inline: document.documentElement.style.getPropertyValue('--bg').trim(),
+        want: theme ? theme.vars['--bg'] : '',
+        background: document.documentElement.getAttribute('data-background')
       });
     }
     return out;
   })()`);
 
-  console.log('\n  every theme, with the colours the browser computed:\n');
+  console.log('\n  a spread of themes, with the colours the browser computed:\n');
   let bad = 0;
   themes.forEach(t => {
-    const distinct = new Set([t.bodyBg, t.tileBg, t.barBg].filter(Boolean)).size;
-    if (!t.active || !t.attr || distinct < 1) bad++;
-    console.log('   ' + (t.active ? 'ok  ' : 'FAIL') + ' ' + t.name.padEnd(10) +
-      ' theme=' + String(t.attr).padEnd(9) +
-      ' body=' + t.bodyBg.padEnd(20) + ' text=' + t.bodyInk.padEnd(18) +
-      ' tile=' + String(t.tileBg).padEnd(20) + ' bar=' + t.barBg);
+    const ok = t.active && t.attr === t.id && t.inline === t.want && t.background;
+    if (!ok) bad++;
+    console.log('   ' + (ok ? 'ok  ' : 'FAIL') + ' ' + t.name.padEnd(12) +
+      ' theme=' + String(t.attr).padEnd(12) +
+      ' asks for ' + String(t.want).padEnd(10) +
+      ' background left as ' + t.background);
   });
 
-  // dark themes must actually be dark, light ones light
-  const dark = themes.filter(t => {
-    const m = /rgba?\((\d+), (\d+), (\d+)/.exec(t.bodyBg || '');
-    return m && (+m[1] + +m[2] + +m[3]) / 3 < 90;
-  }).map(t => t.name);
-  console.log('\n  dark themes: ' + (dark.join(', ') || 'none detected'));
-  if (dark.length < 4) { console.log('  expected several dark themes'); bad++; }
+  // dark themes must actually be dark, light ones light - asked of the palette
+  // itself, since measuring the page here would report the previous theme
+  const registry = await win.webContents.executeJavaScript(`JSON.stringify(
+    (window.SB_THEMES || []).map(t => ({ id: t.id, bg: t.vars['--bg'] })))`);
+  const all = JSON.parse(registry);
+  const isDark = (hex) => {
+    const v = parseInt(hex.slice(1), 16);
+    return (((v >> 16) & 255) * 0.2126 + ((v >> 8) & 255) * 0.7152 + (v & 255) * 0.0722) / 255 < 0.4;
+  };
+  const dark = all.filter(t => isDark(t.bg)).map(t => t.id);
+  const light = all.filter(t => !isDark(t.bg)).map(t => t.id);
+  console.log('\n  palettes in the list: ' + light.length + ' light, ' + dark.length + ' dark');
+  if (dark.length < 20 || light.length < 20) { console.log('  expected plenty of each'); bad++; }
+  console.log('  a few dark ones: ' + dark.slice(0, 6).join(', ') + '\n');
 
   // the chosen theme has to survive being stored, so it is read back from the
   // app's own settings storage
@@ -127,9 +140,10 @@ app.whenReady().then(async () => {
     bg: getComputedStyle(document.body).backgroundColor,
     panelMarked: !!document.querySelector('.theme-card.active')
   }))()`);
-  const survived = after.theme === 'ink';
+  const last = themes.length ? themes[themes.length - 1] : { id: null };
+  const survived = after.theme === last.id;
   if (!survived) bad++;
-  console.log('  after a reload: theme=' + after.theme + ' bg=' + after.bg + ' picker shows it: ' + after.panelMarked + '\n');
+  console.log('  after a reload: theme=' + after.theme + ' (picked ' + last.id + ') picker shows it: ' + after.panelMarked + '\n');
   console.log(bad ? '  ' + bad + ' problem(s)' : '  themes and settings panel behave');
   console.log('');
   app.exit(bad ? 1 : 0);

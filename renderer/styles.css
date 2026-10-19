@@ -154,7 +154,7 @@ body {
 }
 #app { height: 100vh; display: flex; flex-direction: column; }
 
-/* Top bar — the search field, and the settings button tucked into the corner so
+/* Top bar â€” the search field, and the settings button tucked into the corner so
    the field can stay optically centred. */
 #topbar {
   display: flex; align-items: center; justify-content: center;
@@ -168,7 +168,7 @@ body {
   width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
   font-size: 16px; line-height: 1; padding: 0;
 }
-/* The field itself is invisible at rest — it reads as part of the page — and
+/* The field itself is invisible at rest â€” it reads as part of the page â€” and
    only draws itself in when you point at it or start typing. */
 #searchInput {
   width: min(460px, 60vw);
@@ -328,7 +328,7 @@ body {
 #readerControls .font-group { display: flex; align-items: center; gap: 7px; }
 
 /* Phone: the reader bar has more controls than fits, so the title keeps the
-   top row and the controls scroll sideways underneath it — otherwise Clean and
+   top row and the controls scroll sideways underneath it â€” otherwise Clean and
    Full end up off-screen where they cannot be tapped. */
 @media (max-width: 620px) {
   #readerBar { flex-wrap: wrap; gap: 8px; padding: 10px 14px; }
@@ -516,7 +516,7 @@ body {
   border-radius: 999px; pointer-events: none; opacity: 0; transition: opacity .25s ease;
 }
 .immersive-hint.show { opacity: 1; }
-/* Reader fullscreen — position must be restated: #readerView is position:relative
+/* Reader fullscreen â€” position must be restated: #readerView is position:relative
    in normal flow, and an author rule beats the UA's :fullscreen position:fixed,
    which left the top of the screen showing the library behind it. */
 #readerView:fullscreen {
@@ -690,25 +690,46 @@ kbd {
 }
 .set-note { font-size: 12.5px; color: var(--muted); line-height: 1.65; margin: 0 0 12px; }
 
-/* Theme picker: each swatch previews its own three colours. */
-.theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
-.theme-card {
-  border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
-  cursor: pointer; padding: 0; background: none; text-align: left;
-  transition: border-color .15s, transform .15s;
+/* Theme picker: a searchable list, not a wall of cards - there are a couple of
+ * hundred colours and a dozen backgrounds, which is too many to look at at once.
+ * The name is on the left and the colours that matter are on the right, so the
+ * chosen one can be spotted by its swatches as much as by its name. */
+.theme-search-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.set-row { display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+.set-count { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+#themeSearch {
+  width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px;
+  background: var(--soft); color: var(--ink); font: inherit; font-size: 13px; outline: none;
 }
-.theme-card:hover { transform: translateY(-1px); }
-.theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
-.theme-swatches { display: flex; height: 42px; }
+#themeSearch:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-soft); }
+.theme-grid {
+  display: grid; grid-template-columns: 1fr; gap: 2px;
+  max-height: min(46vh, 420px); overflow-y: auto; padding-right: 4px;
+}
+.theme-group {
+  position: sticky; top: 0; z-index: 1; padding: 9px 10px 7px; margin-top: 6px;
+  background: var(--panel); color: var(--muted);
+  font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+}
+.theme-group:first-child { margin-top: 0; }
+.theme-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid transparent; border-radius: 10px; cursor: pointer;
+  padding: 7px 10px; background: none; text-align: left; width: 100%;
+  transition: background-color .12s, border-color .12s;
+}
+.theme-card:hover { background: var(--soft); }
+.theme-card.active { background: var(--soft); border-color: var(--accent); }
+.theme-swatches { display: flex; height: 20px; width: 62px; flex: none; border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
 .theme-swatches i { flex: 1; }
 .theme-name {
-  display: block; padding: 6px 8px 7px; font-size: 11.5px; font-weight: 600;
-  color: var(--ink); background: var(--panel);
+  font-size: 13px; font-weight: 600; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.theme-empty { padding: 16px 10px; color: var(--muted); font-size: 13px; }
 @media (max-width: 620px) {
   #settingsPanel { width: 100vw; border-left: 0; }
-  .theme-grid { grid-template-columns: repeat(2, 1fr); }
+  .theme-grid { max-height: 40vh; }
 }
 
 /* ============================================================
@@ -818,7 +839,7 @@ kbd {
 
 body {
   background-color: var(--bg);
-  background-image: var(--texture);
+  background-image: var(--sb-bg, none); background-size: var(--sb-bg-size, auto);
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-ui);
@@ -833,7 +854,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   transition: background-color .3s var(--ease-ui), border-color .3s var(--ease-ui);
 }
 #topbar { border-bottom: 1px solid var(--line); backdrop-filter: blur(14px); }
-#readerView { background: var(--bg); background-image: var(--texture); }
+#readerView { background: var(--bg); background-image: var(--sb-bg, none); background-size: var(--sb-bg-size, auto); }
 #readerTitle, .section-title, .empty-title, .audio-title, #modal h3, .set-head h2 {
   font-family: var(--font-display);
 }
@@ -866,7 +887,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .progress-fill { transition: width .5s var(--ease-ui); }
 #searchInput { font-family: var(--font-ui); }
 #searchInput:focus { box-shadow: 0 0 0 4px var(--focus-soft); }
-#epubScroll, #epubPaged { background-color: var(--reader-bg); background-image: var(--texture); background-attachment: fixed; }
+#epubScroll, #epubPaged { background-color: var(--reader-bg); background-image: var(--sb-bg, none); background-size: var(--sb-bg-size, auto); background-attachment: fixed; }
 #settingsScrim:not(.hidden) { animation: scrimIn .2s ease both; }
 #settingsPanel { animation: setIn .28s var(--ease-ui) both; }
 #modalOverlay:not(.hidden) #modal { animation: modalIn .25s var(--ease-spring) both; }
@@ -964,7 +985,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
     .plan-features { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
     .plan-features li { display:flex; gap:9px; align-items:flex-start; color:var(--muted); font-size:12.5px; line-height:1.45; }
     .plan-features li::before {
-      content:"✓"; flex:none; width:15px; height:15px; margin-top:1px; border-radius:50%;
+      content:"âœ“"; flex:none; width:15px; height:15px; margin-top:1px; border-radius:50%;
       display:inline-flex; align-items:center; justify-content:center;
       font-size:9px; font-weight:800; color:var(--on-accent); background:var(--focus); opacity:.85;
     }

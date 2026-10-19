@@ -18,14 +18,22 @@ const tsExe = (() => {
 const bare = (s) => String(s).replace(/\x1b\[[0-9;;]*[A-Za-z]/g, '');
 const st = spawnSync(tsExe, ['funnel', 'status'], { encoding: 'utf8', timeout: 12000, killSignal: 'SIGKILL' });
 const mm = /https:\/\/([a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net)/i.exec(bare((st.stdout || '') + (st.stderr || '')));
-const URL_ = mm ? 'https://' + mm[1] : '';
+const URL_ = mm ? 'https://' + mm[1] : 'http://127.0.0.1:' + (process.env.SB_PORT || 8787);
 if (!URL_) { console.log('no address to test'); app.exit(1); }
 app.disableHardwareAcceleration();
 let bad = 0;
 const check = (ok, label, extra) => { if (!ok) bad++; console.log('   ' + (ok ? 'ok  ' : 'FAIL') + ' ' + label + (extra ? '   ' + extra : '')); };
 
 app.whenReady().then(async () => {
-  const win = new BrowserWindow({ show: false, width: 1280, height: 900 });
+  const win = new BrowserWindow({
+    show: false, width: 1280, height: 900,
+    webPreferences: { backgroundThrottling: false }
+  });
+  // Fullscreen cannot be entered in a window that has never been on screen, so
+  // this one is put on the display - well off to the left, out of the way.
+  win.setPosition(-4000, 0);
+  win.showInactive();
+  await new Promise(r => setTimeout(r, 600));
   await win.loadURL(URL_);
   await new Promise(r => setTimeout(r, 1500));
   await win.webContents.executeJavaScript(`(async () => {

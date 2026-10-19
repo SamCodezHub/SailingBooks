@@ -20,7 +20,7 @@ const tsExe = (() => {
 const bare = (s) => String(s).replace(/\x1b\[[0-9;;]*[A-Za-z]/g, '');
 const st = spawnSync(tsExe, ['funnel', 'status'], { encoding: 'utf8', timeout: 12000, killSignal: 'SIGKILL' });
 const mm = /https:\/\/([a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net)/i.exec(bare((st.stdout || '') + (st.stderr || '')));
-const URL_ = mm ? 'https://' + mm[1] : '';
+const URL_ = mm ? 'https://' + mm[1] : 'http://127.0.0.1:' + (process.env.SB_PORT || 8787);
 if (!URL_) { console.log('no funnel address'); app.exit(1); }
 app.disableHardwareAcceleration();
 

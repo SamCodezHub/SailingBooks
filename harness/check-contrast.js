@@ -21,12 +21,18 @@ const tsExe = (() => {
 const bare = (s) => String(s).replace(/\x1b\[[0-9;;]*[A-Za-z]/g, '');
 const st = spawnSync(tsExe, ['funnel', 'status'], { encoding: 'utf8', timeout: 12000, killSignal: 'SIGKILL' });
 const mm = /https:\/\/([a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net)/i.exec(bare((st.stdout || '') + (st.stderr || '')));
-const URL_ = mm ? 'https://' + mm[1] : '';
+const URL_ = mm ? 'https://' + mm[1] : 'http://127.0.0.1:' + (process.env.SB_PORT || 8787);
 if (!URL_) { console.log('no address to test'); app.exit(1); }
 app.disableHardwareAcceleration();
 
 app.whenReady().then(async () => {
-  const win = new BrowserWindow({ show: false, width: 1280, height: 900 });
+  const win = new BrowserWindow({
+  show: false, width: 1280, height: 900,
+  // A hidden window has its animation frames throttled to a crawl, and the
+  // measurement waits for a frame after every theme. Without this, walking a
+  // couple of hundred themes takes half an hour.
+  webPreferences: { backgroundThrottling: false }
+});
   await win.loadURL(URL_);
   await new Promise(r => setTimeout(r, 1500));
   await win.webContents.executeJavaScript(`(async () => {
@@ -104,14 +110,22 @@ app.whenReady().then(async () => {
     ];
 
     const out = [];
-    const names = ['Light','Paper','Solar','Mono','Midnight','Dusk','Ocean','Forest','Ink'];
+    // Every colour there is, not a chosen nine. The palettes are applied through
+    // the app's own function rather than by clicking a row, so a couple of
+    // hundred themes can be measured in a sensible time.
+    const names = (window.SB_ui?.themes || []).map(t => t.name);
     for (const name of names) {
-      // switch by attribute rather than by clicking a card: one source of truth,
-      // no dependence on the picker's own re-render
-      const id = name.toLowerCase();
-      document.documentElement.setAttribute('data-theme', id);
+      // switch by applying the palette rather than by clicking a card: one source
+      // of truth, no dependence on the picker's own re-render
+      const theme = (window.SB_ui?.themes || []).find(t => t.name === name);
+      window.SB_ui?.applyTheme(theme.id);
       document.getElementById('settingsPanel') && document.getElementById('settingsPanel').classList.add('hidden');
-      await sleep(180);
+      // The palette is written straight onto the document as custom properties,
+      // and the page does not recalculate until it is asked to. Reading in the
+      // same breath as writing gets the *previous* theme's background, which made
+      // every dark theme look like it was light text on white - and that passed.
+      void document.body.offsetHeight;
+      await new Promise(r => requestAnimationFrame(r));
 
       const rows = [];
       for (const [label, sel] of TARGETS) {
@@ -124,7 +138,7 @@ app.whenReady().then(async () => {
         const r = ratio(t, bg);
         rows.push({ label, r: Math.round(r * 100) / 100, fg: getComputedStyle(el).color, bg: 'rgb(' + bg.r + ',' + bg.g + ',' + bg.b + ')' });
       }
-      out.push({ name, rows });
+      out.push({ name, rows, bodyBg: getComputedStyle(document.body).backgroundColor });
     }
     return out;
   })()`);
@@ -133,19 +147,43 @@ app.whenReady().then(async () => {
   // better than that, so small text is held to 4.5
   const LARGE = new Set(['book title', 'folder name', 'theme name']);
   let bad = 0;
-  console.log('\n  contrast of every piece of text, per theme (WCAG ratio)\n');
+  const failures = [];
+  let worstOverall = null;
   for (const t of report) {
     const fails = t.rows.filter(r => r.missing || r.noColor || r.r < (LARGE.has(r.label) ? 3 : 4.5));
     const worst = t.rows.filter(r => r.r).sort((a, b) => a.r - b.r)[0];
-    console.log('  ' + (fails.length ? 'FAIL ' : 'ok   ') + t.name.padEnd(9) +
-      (worst ? 'worst: ' + worst.label + ' ' + worst.r : ''));
-    for (const f of fails) {
-      bad++;
-      console.log('         ' + f.label + ': ' + (f.missing ? 'not on the page' : f.noColor ? 'no colour' :
-        f.r + '  ' + f.fg + ' on ' + f.bg));
+    if (worst && (!worstOverall || worst.r < worstOverall.r)) worstOverall = { name: t.name, ...worst };
+    for (const f of fails) failures.push({ theme: t.name, ...f });
+    bad += fails.length;
+  }
+  console.log('\n  contrast of every piece of text, in every theme (WCAG ratio)\n');
+  console.log('    themes measured : ' + report.length);
+  console.log('    pieces measured : ' + report.reduce((n, t) => n + t.rows.length, 0));
+  const dirty = new Set(failures.map(f => f.theme)).size;
+  console.log('    thin text       : ' + (report.length - dirty) + ' themes clear of it, ' + dirty + ' with something unreadable');
+  if (worstOverall) console.log('    thinnest pair   : ' + worstOverall.name + ' - ' + worstOverall.label + ' ' + worstOverall.r);
+  if (failures.length) {
+    console.log('\n  what could not be read:\n');
+    for (const f of failures.slice(0, 25)) {
+      console.log('    ' + (f.theme + ' / ' + f.label).padEnd(34) +
+        (f.missing ? 'not on the page' : f.noColor ? 'no colour' : f.r + '  ' + f.fg + ' on ' + f.bg));
     }
+    if (failures.length > 25) console.log('    ... and ' + (failures.length - 25) + ' more');
   }
 
   console.log('\n  ' + (bad ? bad + ' unreadable combination(s)' : 'every piece of text is readable in every theme') + '\n');
-  app.exit(bad ? 1 : 0);
+
+  /* A measurement that never left white would call every dark theme perfect -
+   * light text on white is a huge ratio - so the backgrounds themselves are
+   * checked for both kinds. This is the check that would have caught it. */
+  const lum = (c) => {
+    const m = /rgba?\((\d+), (\d+), (\d+)/.exec(c || '');
+    if (!m) return null;
+    return (0.2126 * +m[1] + 0.7152 * +m[2] + 0.0722 * +m[3]) / 255;
+  };
+  const shades = report.map(t => ({ name: t.name, l: lum(t.bodyBg) })).filter(x => x.l !== null);
+  const dark = shades.filter(x => x.l < 0.3), light = shades.filter(x => x.l > 0.6);
+  console.log('  backgrounds actually measured: ' + dark.length + ' dark, ' + light.length + ' light' +
+    (dark.length && light.length ? '' : '   <- this measurement is not looking at the themes') + '\n');
+  app.exit(bad || !dark.length || !light.length ? 1 : 0);
 }).catch(e => { console.error(e); app.exit(1); });

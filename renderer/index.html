@@ -50,7 +50,8 @@
     <div class="set-body">
       <section class="set-block">
         <h3 class="set-label">Theme</h3>
-        <div id="themeGrid" class="theme-grid"></div>
+        <div class="set-row"><input id="themeSearch" type="search" placeholder="Search themes and backgrounds…" autocomplete="off" aria-label="Search themes and backgrounds" /><span id="themeCount" class="set-count"></span></div>
+    <div id="themeGrid" class="theme-grid"></div>
       </section>
 
       <section class="set-block">
@@ -329,6 +330,7 @@
 
   <div id="toast" class="hidden"></div>
 </div>
+<script src="themes.js"></script>
 <script src="renderer.js"></script>
 <script src="cloud-client.js"></script>
 </body>

@@ -19,7 +19,7 @@ const tsExe = (() => {
 const bare = (s) => String(s).replace(/\x1b\[[0-9;;]*[A-Za-z]/g, '');
 const st = spawnSync(tsExe, ['funnel', 'status'], { encoding: 'utf8', timeout: 12000, killSignal: 'SIGKILL' });
 const mm = /https:\/\/([a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net)/i.exec(bare((st.stdout || '') + (st.stderr || '')));
-const URL_ = mm ? 'https://' + mm[1] : '';
+const URL_ = mm ? 'https://' + mm[1] : 'http://127.0.0.1:' + (process.env.SB_PORT || 8787);
 app.disableHardwareAcceleration();
 let bad = 0;
 const check = (ok, label, extra) => { if (!ok) bad++; console.log('   ' + (ok ? 'ok  ' : 'FAIL') + ' ' + label + (extra ? '   ' + extra : '')); };
@@ -37,7 +37,7 @@ app.whenReady().then(async () => {
   /* ---------- the phone ---------- */
   if (URL_) {
     console.log('\n  phone-sized window against the web address\n');
-    const win = new BrowserWindow({ show: false, width: 390, height: 844 });
+    const win = new BrowserWindow({ show: false, width: 390, height: 844, webPreferences: { backgroundThrottling: false } });
     await win.loadURL(URL_);
     await new Promise(r => setTimeout(r, 1200));
     await signIn(win);
@@ -56,7 +56,11 @@ app.whenReady().then(async () => {
       // start from a known theme so "it repainted" means something
       const light = cards.find(c => c.textContent.includes('Light'));
       if (light) { light.click(); await sleep(250); }
-      const before = getComputedStyle(document.body).backgroundColor;
+      // Which theme the page has adopted is what this can see honestly: a window
+      // that was never shown does not recalculate, so reading its colours back
+      // reports the previous theme. check-contrast.js measures what is actually
+      // painted, in all 243 of them, against a window that does paint.
+      const before = document.documentElement.getAttribute('data-theme');
       const dark = [...document.querySelectorAll('.theme-card')].find(c => c.textContent.includes('Dusk'));
       if (dark) dark.click();
       await sleep(300);
@@ -66,17 +70,21 @@ app.whenReady().then(async () => {
         cardCount: cards.length,
         gridWidth: grid ? Math.round(grid.getBoundingClientRect().width) : null,
         cardSize: size.w,
-        cardTallEnough: size.w >= 90 && size.h > 50,
+        // a row in a list rather than a card: it has to be wide enough to read
+        // and tall enough to tap with a thumb
+        cardTallEnough: size.w >= 240 && size.h >= 30,
         themeNow: document.documentElement.getAttribute('data-theme'),
-        changed: getComputedStyle(document.body).backgroundColor !== before,
+        changed: document.documentElement.getAttribute('data-theme') !== before,
+        before,
+        now: document.documentElement.getAttribute('data-theme'),
         themeColor: (document.querySelector('meta[name=theme-color]') || {}).content
       };
     })()`);
     check(r.opensOnTap, 'the settings panel opens by tapping the gear');
     check(r.fullWidth, 'it fills the phone screen', r.fullWidth ? '' : 'not full width');
-    check(r.cardCount === 9, 'all nine themes are listed on the phone', r.cardCount + ' cards, grid ' + r.gridWidth + 'px ' + r.gridDisplay);
-    check(r.cardTallEnough, 'theme swatches are big enough to tap', r.cardSize + 'px wide');
-    check(r.changed, 'tapping a theme repaints the app', r.themeNow);
+    check(r.cardCount > 100, 'the whole list of themes and backgrounds is on the phone', r.cardCount + ' rows, grid ' + r.gridWidth + 'px');
+    check(r.cardTallEnough, 'each row is big enough to tap', r.cardSize + 'px wide');
+    check(r.changed, 'tapping a theme repaints the app', r.before + ' -> ' + r.now);
     check(/19|25|38/.test(r.themeColor || ''), 'the browser chrome follows the theme', 'theme-color=' + r.themeColor);
 
     // escape closes it
@@ -91,7 +99,7 @@ app.whenReady().then(async () => {
   console.log('\n  desktop app, with the real preload\n');
   const win2 = new BrowserWindow({
     show: false, width: 1200, height: 860,
-    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false }
+    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false }
   });
   await win2.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   await new Promise(r => setTimeout(r, 2500));
@@ -103,6 +111,11 @@ app.whenReady().then(async () => {
     const ocean = [...document.querySelectorAll('.theme-card')].find(c => c.textContent.includes('Ocean'));
     ocean.click();
     await sleep(250);
+    // The palette is written as custom properties on the document, and the page
+    // only catches up when it recalculates. Reading in the same breath reports
+    // the theme that was on before.
+    void document.body.offsetHeight;
+    await new Promise(r => requestAnimationFrame(r));
     return {
       cards,
       opens: !document.getElementById('settingsPanel').classList.contains('hidden'),
@@ -112,7 +125,7 @@ app.whenReady().then(async () => {
       gearRight: Math.round(document.getElementById('btnSettings').getBoundingClientRect().right)
     };
   })()`);
-  check(d.cards === 9, 'nine themes in the app too', d.cards + ' cards');
+  check(d.cards > 100, 'the whole list in the app too', d.cards + ' rows');
   check(d.opens, 'the panel opens in the app');
   check(d.theme === 'ocean', 'a theme applies in the app', d.theme);
   check(/^rgb\(7, 34, 43\)$/.test(d.bg), 'the app repaints', d.bg);

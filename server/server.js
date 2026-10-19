@@ -308,6 +308,7 @@ async function serveClient(res, urlPath) {
         html = await fsp.readFile(path.join(RENDERER, 'index.html'), 'utf8');
         // Browser build only: the window.api shim + the sign-in gate.
         html = html.replace('<div id="app">', gate + '\n<div id="app">');
+        // themes.js is already in the page; these three are the browser-only parts.
         html = html.replace(/<script src="renderer\.js"><\/script>/,
           '<script src="/api-shim.js"></script>\n<script src="/login.js"></script>\n<script src="/renderer.js"></script>');
         // This copy is being served BY the laptop, so the phone is already at the
@@ -322,6 +323,7 @@ async function serveClient(res, urlPath) {
   const map = {
     '/styles.css': path.join(RENDERER, 'styles.css'),
     '/renderer.js': path.join(RENDERER, 'renderer.js'),
+    '/themes.js': path.join(RENDERER, 'themes.js'),
     '/api-shim.js': SHIM,
     '/login.js': path.join(ROOT, 'web', 'login.js'),
     '/cloud-client.js': CLOUD_CLIENT,

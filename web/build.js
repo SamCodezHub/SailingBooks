@@ -22,6 +22,7 @@ fs.mkdirSync(OUT, { recursive: true });
 let html = read(path.join(ROOT, 'renderer', 'index.html'));
 const gate = read(path.join(__dirname, 'login.html'));
 html = html.replace('<div id="app">', gate + '\n<div id="app">');
+// themes.js is already in the page; only the browser-only parts are added here.
 html = html.replace(/<script src="renderer\.js"><\/script>/,
     '<script src="api-shim.js"></script>\n<script src="login.js"></script>\n<script src="renderer.js"></script>');
   // The app runs from renderer/, so it reaches the icon in ../assets/. This copy
@@ -32,6 +33,7 @@ html = html.replace(/<script src="renderer\.js"><\/script>/,
 
 fs.writeFileSync(path.join(OUT, 'styles.css'), read(path.join(ROOT, 'renderer', 'styles.css')));
 fs.writeFileSync(path.join(OUT, 'renderer.js'), read(path.join(ROOT, 'renderer', 'renderer.js')));
+fs.writeFileSync(path.join(OUT, 'themes.js'), read(path.join(ROOT, 'renderer', 'themes.js')));
 fs.writeFileSync(path.join(OUT, 'api-shim.js'), read(path.join(__dirname, 'api-shim.js')));
 fs.writeFileSync(path.join(OUT, 'login.js'), read(path.join(__dirname, 'login.js')));
 fs.writeFileSync(path.join(OUT, 'cloud-client.js'), read(path.join(ROOT, 'renderer', 'cloud-client.js')));
