@@ -2182,6 +2182,32 @@ function syncTitleBar(theme) {
   try { Promise.resolve(window.api.setTitleBarOverlay({ symbolColor: ink })).catch(() => {}); } catch {}
 }
 
+/* The window buttons live in the top-right corner, over our own bar. How much
+ * room they take is not a constant - it follows the display scale - so it is
+ * measured rather than guessed, and handed to the stylesheet, which keeps the
+ * account, the plan badge, the gear and the settings drawer clear of them.
+ *
+ * It cannot be done in CSS alone: the one way to ask the platform in CSS is a
+ * difference of percentages, and `right` will not take a percentage, so the gear
+ * silently stayed put while everything else moved. */
+function syncCaptionReserve() {
+  const wco = navigator.windowControlsOverlay;
+  const root = document.documentElement;
+  if (!wco || typeof wco.getTitlebarAreaRect !== 'function') return;
+  // With no overlay in play the platform hands back a rect of nothing, and the
+  // honest answer is then "no buttons to make room for" - not the whole window.
+  const area = wco.getTitlebarAreaRect();
+  const reserve = area && area.width > 0
+    ? Math.max(0, Math.round(window.innerWidth - (area.x + area.width)))
+    : 0;
+  root.style.setProperty('--caption-reserve', reserve + 'px');
+}
+let captionReserveT = null;
+window.addEventListener('resize', () => {
+  if (captionReserveT) return;
+  captionReserveT = setTimeout(() => { captionReserveT = null; syncCaptionReserve(); }, 120);
+});
+
 function applyBackground(name) {
   const bg = window.SB_findBackground?.(name) || BACKGROUNDS[0];
   if (!bg) return;
@@ -3122,6 +3148,7 @@ function startApp() {
   if (BROWSER_LOCAL) $('#libHint').textContent = 'Books added here stay in this browser on this device.';
   applyReaderStyle();
   syncSettingsUI();
+  syncCaptionReserve();
   pdfReady().catch(() => {});
   if (WEB && !BROWSER_LOCAL) return;   // a connected laptop owns the remote library
   // Covers now live as files: migrate once, then auto-adopt anything new.

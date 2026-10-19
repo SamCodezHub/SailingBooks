@@ -945,20 +945,25 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
  * becomes the drag region so the window can still be moved, and everything you
  * can click or type into opts back out of it.
  *
- * The platform tells us how wide the window buttons are, and we keep that much
- * room free at the right of the bar so nothing ends up underneath them. In a
- * browser or on the phone there are no window buttons, the numbers come out as
- * nothing, and the bar is laid out exactly as it was. */
-:root { --caption-reserve: calc(100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%)); }
+ * --caption-reserve is how wide those buttons are, measured and handed over by
+ * the renderer (see syncCaptionReserve) rather than guessed at in CSS. Anything
+ * that sits at the right-hand end of the bar, and the settings drawer that opens
+ * across it, keeps that much room so nothing ends up underneath them. In a
+ * browser or on the phone there are no window buttons, the number stays zero,
+ * and the layout is exactly what it was. */
+:root { --caption-reserve: 0px; }
 #topbar, #readerBar { -webkit-app-region: drag; app-region: drag; }
 #topbar button, #topbar input, #topbar select, #topbar a, #topbar .library-nav,
 #readerBar button, #readerBar input, #readerBar select, #readerBar a {
   -webkit-app-region: no-drag; app-region: no-drag;
 }
 #topbar { padding-right: calc(22px + var(--caption-reserve)); }
-.account-group { margin-right: calc(48px + var(--caption-reserve)); }
+.account-group { margin-right: calc(58px + var(--caption-reserve)); }
 #btnSettings { right: calc(14px + var(--caption-reserve)); }
 #readerBar { padding-right: calc(20px + var(--caption-reserve)); min-height: 62px; box-sizing: border-box; }
+/* The drawer opens over the top-right corner, where the window buttons are, so
+   its own heading and its close button step aside for them. */
+.set-head { padding-right: calc(18px + var(--caption-reserve)); }
 #cloudLanding, #onlineLibraryView { flex:1; overflow:auto; }
 #cloudLanding:not(.hidden) { display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,420px); align-items:center; gap:clamp(32px,8vw,120px); padding:clamp(28px,7vw,100px) max(7vw,24px); background-color:var(--bg); background-image:var(--texture); }
 .landing-copy { max-width:660px; }

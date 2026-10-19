@@ -70,6 +70,61 @@ const READER = `(() => {
   };
 })()`;
 
+const SIGNED_IN = `(() => {
+  // What the bar looks like once someone is signed in: their name and the plan
+  // it is, which is the widest the right-hand end of the bar ever gets.
+  const btn = document.getElementById('btnAccount');
+  btn.textContent = 'samruddhc';
+  btn.classList.remove('hidden');
+  const pill = document.getElementById('accountPlanPill');
+  pill.textContent = 'Free';
+  pill.classList.remove('hidden');
+  document.getElementById('btnSettings').classList.remove('hidden');
+  return 1;
+})()`;
+
+const BAR_RIGHT = `JSON.stringify((() => {
+  const bar = document.getElementById('topbar').getBoundingClientRect();
+  const reserve = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--caption-reserve'));
+  const box = el => { const r = el.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right) }; };
+  const gear = document.getElementById('btnSettings');
+  const name = document.getElementById('btnAccount');
+  const pill = document.getElementById('accountPlanPill');
+  const g = box(gear), n = box(name), p = box(pill);
+  return {
+    reserve: Math.round(reserve),
+    barRight: Math.round(bar.right),
+    stripLeft: Math.round(bar.right - reserve),
+    gear: g, name: n, pill: p,
+    gearInStrip: g.r > bar.right - reserve + 1,
+    pillInStrip: p.r > bar.right - reserve + 1,
+    nameInStrip: n.r > bar.right - reserve + 1,
+    gapPillGear: g.l - p.r,
+    gapNamePill: p.l - n.r
+  };
+})())`;
+
+const DRAWER = `JSON.stringify((() => {
+  document.getElementById('settingsScrim').classList.remove('hidden');
+  document.getElementById('settingsPanel').classList.remove('hidden');
+  const bar = document.getElementById('topbar').getBoundingClientRect();
+  const reserve = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--caption-reserve'));
+  const close = document.getElementById('btnSettingsClose').getBoundingClientRect();
+  const title = document.querySelector('.set-head h2').getBoundingClientRect();
+  const panel = document.getElementById('settingsPanel').getBoundingClientRect();
+  return {
+    reserve: Math.round(reserve),
+    panelRight: Math.round(panel.right),
+    stripLeft: Math.round(bar.right - reserve),
+    closeRight: Math.round(close.right),
+    closeInStrip: close.right > bar.right - reserve + 1,
+    titleRight: Math.round(title.right),
+    titleInStrip: title.right > bar.right - reserve + 1,
+    closeW: Math.round(close.width),
+    headPadding: Math.round(parseFloat(getComputedStyle(document.querySelector('.set-head')).paddingRight))
+  };
+})())`;
+
 app.whenReady().then(async () => {
   const win = new BrowserWindow({
     width: 1200, height: 900, show: false,
@@ -117,6 +172,55 @@ app.whenReady().then(async () => {
   check(reader.reserve > 60, 'with the same room kept for the window buttons', reader.reserve + 'px');
   check(reader.height >= 56, 'and it is tall enough to line up with the bar above', reader.height + 'px');
   check(reader.clean <= reader.width - reader.reserve + 1, 'so Clean is not underneath them', 'clean ends ' + reader.clean + ' of ' + reader.width);
+
+  say('\n  the account and the plan do not sit under the window buttons\n');
+  await win.webContents.executeJavaScript(SIGNED_IN);
+  await new Promise(r2 => setTimeout(r2, 300));
+  const acct = JSON.parse(await win.webContents.executeJavaScript(BAR_RIGHT));
+  check(acct.reserve > 60, 'the room for them is measured, not guessed', acct.reserve + 'px');
+  check(!acct.nameInStrip, 'the account name is clear of them', 'name ends ' + acct.name.r + ', strip starts ' + acct.stripLeft);
+  check(!acct.pillInStrip, 'and so is the plan beside it', 'plan ends ' + acct.pill.r + ', strip starts ' + acct.stripLeft);
+  check(!acct.gearInStrip, 'and the gear is clear of them', 'gear ends ' + acct.gear.r + ', strip starts ' + acct.stripLeft);
+  check(acct.gapPillGear >= 6, 'with room between the plan and the gear', acct.gapPillGear + 'px between them');
+  check(acct.gapNamePill >= 4, 'and between the name and the plan', acct.gapNamePill + 'px');
+
+  say('\n  and neither does the settings drawer\n');
+  const drawer = JSON.parse(await win.webContents.executeJavaScript(DRAWER));
+  check(drawer.reserve > 60, 'the drawer knows how much room they take', drawer.reserve + 'px');
+  check(!drawer.closeInStrip, 'its close button is not underneath them', 'ends ' + drawer.closeRight + ', strip starts ' + drawer.stripLeft);
+  check(!drawer.titleInStrip, 'nor its heading', 'heading ends ' + drawer.titleRight + ', strip starts ' + drawer.stripLeft);
+  check(drawer.headPadding >= drawer.reserve, 'because its heading keeps that room', drawer.headPadding + 'px padding-right');
+
+  say('\n  and a window with no window buttons is left alone\n');
+  // The platform reports "no buttons" as a rectangle of nothing. Reading that as
+  // room to keep moved everything the width of the window, so this is the case
+  // worth pinning down: it is also every browser and every phone.
+  win.hide();   // closed the window itself would take the app down with it
+  const plain = new BrowserWindow({
+    width: 390, height: 844, show: false,
+    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false }
+  });
+  plain.setPosition(-4000, 0);
+  await plain.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  await new Promise(r2 => setTimeout(r2, 1500));
+  const bare = await plain.webContents.executeJavaScript(`(() => {
+    const bar = document.getElementById('topbar');
+    const cs = getComputedStyle(bar);
+    const reader = getComputedStyle(document.getElementById('readerBar'));
+    return {
+      reserve: Math.round(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--caption-reserve'))),
+      padding: Math.round(parseFloat(cs.paddingRight)),
+      readerPadding: Math.round(parseFloat(reader.paddingRight)),
+      overflow: Math.round(document.getElementById('readerControls').scrollWidth - document.getElementById('readerControls').clientWidth),
+      width: window.innerWidth,
+      gear: (() => { const r = document.getElementById('btnSettings').getBoundingClientRect(); return Math.round(r.right); })()
+    };
+  })()`);
+  check(bare.reserve === 0, 'the room kept for them is nothing', bare.reserve + 'px');
+  check(bare.padding <= 24, 'so the bar is padded as it always was', bare.padding + 'px padding-right');
+  check(bare.readerPadding <= 22, 'and so is the reader bar', bare.readerPadding + 'px padding-right');
+  check(bare.overflow <= 1, 'with nothing spilling off a narrow window', bare.overflow + 'px over of ' + bare.width + 'px');
+  check(bare.gear <= bare.width, 'and the gear still on screen', 'ends ' + bare.gear + ' of ' + bare.width);
 
   say('');
   say('  ' + (bad ? bad + ' problem(s)' : 'one bar, the window still has its buttons, and everything on the bar still works') + '\n');
