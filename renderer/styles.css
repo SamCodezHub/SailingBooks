@@ -642,7 +642,6 @@ body {
 @media (max-width: 720px) {
   #libHint { display: none; }
   #searchInput { width: 38vw; }
-  #readerControls .font-group select { max-width: 90px; }
 }
 
 /* Settings panel: a slide-over on the laptop, a full sheet on the phone. */

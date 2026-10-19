@@ -2320,8 +2320,6 @@ function applyReaderStyle() {
   c.style.lineHeight = state.settings.lineHeight;
   $('#fontSizeLabel').textContent = state.settings.fontSize + 'px';
   $('#fontSizeLabel').title = `Text size (zoom ${Math.round(state.settings.fontSize / 18 * 100)}%) — A−/A+ or Ctrl + scroll`;
-  $('#fontFamilySelect').value = state.settings.fontFamily;
-  $('#lineHeightSelect').value = String(state.settings.lineHeight);
   const inner = $('#pagedInner');
   if (inner) {
     inner.style.fontSize = state.settings.fontSize + 'px';
@@ -2931,8 +2929,6 @@ $('#searchInput').oninput = (e) => { state.search = e.target.value; render(); };
 
 $('#btnFontDec').onclick = () => changeFontSize(-1);
 $('#btnFontInc').onclick = () => changeFontSize(1);
-$('#fontFamilySelect').onchange = (e) => { captureEpubProgress(); state.settings.fontFamily = e.target.value; save(); applyReaderStyle(); syncSettingsUI(); };
-$('#lineHeightSelect').onchange = (e) => { captureEpubProgress(); state.settings.lineHeight = e.target.value; save(); applyReaderStyle(); syncSettingsUI(); };
 
 /* Settings panel - the same markup and code in the app and in the browser. */
 $('#btnSettings').onclick = () => { settingsOpen() ? closeSettings() : openSettings(); };
