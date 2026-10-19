@@ -2166,6 +2166,20 @@ function applyTheme(name) {
     document.documentElement.style.setProperty(prop, value);
   }
   syncThemeColor();
+  syncTitleBar(theme);
+}
+
+/* On the desktop the app's bar is also the title bar, and Windows keeps its
+ * window buttons on the right of it. Those buttons are painted by the system, so
+ * they have to be told what colour to be - the palette's ink, which is by
+ * definition readable on the bar sitting behind them. In a browser, or on the
+ * phone, there are no window buttons and this quietly does nothing. */
+function syncTitleBar(theme) {
+  if (!window.api || typeof window.api.setTitleBarOverlay !== 'function') return;
+  // The palette hands out CSS variables; Windows wants a plain colour.
+  const ink = [theme && theme.ink, theme && theme.vars && theme.vars['--ink']]
+    .find(c => /^#[0-9a-f]{6}$/i.test(String(c || ''))) || '#1a1a1a';
+  try { Promise.resolve(window.api.setTitleBarOverlay({ symbolColor: ink })).catch(() => {}); } catch {}
 }
 
 function applyBackground(name) {

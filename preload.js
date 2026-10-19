@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld('api', {
   // Lets the app read the mirrored index back (e.g. after files are changed
   // outside the app)
   getLibraryIndex: () => ipcRenderer.invoke('get-library-index'),
+  // Windows draws its window buttons over the app's own bar; they have to be
+  // told which colour to be, or they disappear into a dark theme.
+  setTitleBarOverlay: (options) => ipcRenderer.invoke('set-title-bar-overlay', options),
   importFiles: (paths) => ipcRenderer.invoke('import-files', paths),
   pickFiles: () => ipcRenderer.invoke('pick-files'),
   deleteFile: (p) => ipcRenderer.invoke('delete-file', p),

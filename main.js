@@ -50,8 +50,29 @@ const MAIN_WINDOW_OPTS = {
   title: 'Sailing Books',
   autoHideMenuBar: true,
   // window/taskbar icon (Windows also picks this up from the exe resource)
-  icon: path.join(__dirname, 'assets', 'icon.png')
+  icon: path.join(__dirname, 'assets', 'icon.png'),
+  // One bar instead of two: the app draws the title bar, and Windows keeps its
+  // own window buttons on top of the right-hand end of it, which is what Chrome
+  // does. The colour is transparent so the app bar shows through, and the
+  // renderer tells Windows which symbol colour matches the theme in use.
+  // macOS keeps its own title bar, since its window buttons sit on the left.
+  ...(process.platform === 'darwin' ? {} : {
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#00000000', symbolColor: '#1a1a1a', height: 62 }
+  })
 };
+
+// The window buttons live on our bar, so they have to be told what colour to be.
+ipcMain.handle('set-title-bar-overlay', (event, options) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || typeof win.setTitleBarOverlay !== 'function') return false;
+  try {
+    win.setTitleBarOverlay({ color: '#00000000', ...(options || {}) });
+    return true;
+  } catch {
+    return false;   // no overlay on this platform, or a colour it will not take
+  }
+});
 
 function libraryDir() {
   const dir = path.join(app.getPath('userData'), 'Library');
