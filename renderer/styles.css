@@ -369,6 +369,15 @@ body {
   transition: font-size .1s;
 }
 #epubContent img { max-width: 100%; height: auto; border-radius: 6px; }
+/* A book marks a break between scenes with <hr>. Left alone the browser draws
+   it as a rule straight across the page, which reads as a line between two
+   paragraphs. Books draw it as a short mark in the middle of the page instead,
+   which is what this does. */
+#epubContent hr, #pagedInner hr {
+  border: 0; width: 22%; margin: 1.6em auto; height: 1px;
+  background: var(--line);
+}
+
 /* Book paragraphs: each starts on its own line with the first line indented, and
    nothing runs between one paragraph and the next.
    The border and background resets are marked important deliberately. A book may
@@ -391,6 +400,17 @@ body {
 #epubContent :is(h1,h2,h3,h4,h5,h6,hr,blockquote,figure,img,div,ul,ol) + p,
 #pagedInner :is(h1,h2,h3,h4,h5,h6,hr,blockquote,figure,img,div,ul,ol) + p {
   text-indent: 0 !important;
+}
+/* Not every book calls its paragraphs paragraphs - plenty set them as a div or
+   a list item - and any of them may rule a line under its own text. Running text
+   is not allowed to draw a line or a block of colour whatever element it is in.
+   Figures, images and tables are left out so they keep their own. */
+#epubContent div, #epubContent span, #epubContent li, #epubContent blockquote,
+#pagedInner div, #pagedInner span, #pagedInner li, #pagedInner blockquote {
+  border-style: none !important;
+  border-color: transparent !important;
+  background: none !important;
+  box-shadow: none !important;
 }
 #epubContent h1, #epubContent h2, #epubContent h3 { line-height: 1.25; margin: 1.6em 0 .6em; color: var(--strong); }
 .chapter-break { border: 0; border-top: 1px solid var(--line); margin: 48px auto; max-width: 220px; }

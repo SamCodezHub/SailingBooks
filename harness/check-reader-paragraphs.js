@@ -20,6 +20,8 @@ ipcMain.handle('save-library-index', () => true);
 
 // A chapter that fights the reader: a rule under every paragraph, and its own
 // background. Also a heading and a break, to see the first paragraph after them.
+// And the two shapes books really use for a scene break and for a paragraph that
+// is not a p at all.
 const HOSTILE = `
   <h2>A Chapter</h2>
   <p>First paragraph of the chapter, which should sit flush because it opens a section.</p>
@@ -28,6 +30,8 @@ const HOSTILE = `
   <hr class="chapter-break"/>
   <p>Fourth paragraph, after the break, and it should be flush too.</p>
   <p style="text-indent: 9em">Fifth paragraph, with a huge indent of its own, which the reader should replace with the book indent.</p>
+  <div style="border-bottom:3px solid #00f; background:#eef">A paragraph this book wrote as a div, ruled underneath.</div>
+  <hr class="spacebreak"/>
   <p>Sixth paragraph, indented the book way.</p>`;
 
 const STUB = `(() => {
@@ -57,6 +61,16 @@ const REPORT = `JSON.stringify((() => {
     afterBreak: ps[3] ? d(ps[3]) : null,
     ownIndent: ps[4] ? d(ps[4]) : null,
     sixth: ps[5] ? d(ps[5]) : null,
+    // a paragraph the book wrote as a div, ruled underneath
+    divP: (() => { const el = c.querySelector('div[style]'); if (!el) return null; const s = getComputedStyle(el);
+      return { border: s.borderBottomWidth + ' ' + s.borderBottomStyle, background: s.backgroundColor }; })(),
+    // a scene break must be a short mark in the middle, not a rule across
+    hr: (() => { const el = c.querySelector('hr'); if (!el) return null; const r = el.getBoundingClientRect();
+      const cr = c.getBoundingClientRect(); const s = getComputedStyle(el);
+      return { w: Math.round(r.width), page: Math.round(cr.width), border: s.borderBottomWidth + ' ' + s.borderTopWidth,
+        display: s.display,
+        readerShown: !document.getElementById('readerView').classList.contains('hidden'),
+        scrollShown: !document.getElementById('epubScroll').classList.contains('hidden') }; })(),
     // the paged view is the same words set the other way up
     paged: (() => { const p = document.getElementById('pagedInner'); if (!p) return null;
       p.innerHTML = ${JSON.stringify(HOSTILE)};
@@ -73,6 +87,15 @@ app.whenReady().then(async () => {
   await win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   await new Promise(r => setTimeout(r, 2500));
   await win.webContents.executeJavaScript(STUB);
+  // The reader has to be on show, or the text has no width to be measured in.
+  await win.webContents.executeJavaScript(`(() => {
+    document.getElementById('libraryView').classList.add('hidden');
+    document.getElementById('readerView').classList.remove('hidden');
+    // opening a book un-hides the scrolling view; without a book it stays shut
+    // and there is no width for the text to be measured in.
+    document.getElementById('epubScroll').classList.remove('hidden');
+    return 1;
+  })()`);
   await win.webContents.executeJavaScript(`document.getElementById('epubContent').innerHTML = ${JSON.stringify(HOSTILE)}; 'painted'`);
   const r = JSON.parse(await win.webContents.executeJavaScript(REPORT));
 
@@ -81,6 +104,15 @@ app.whenReady().then(async () => {
   check(r.ruled && /^0px none/.test(r.ruled.border), 'the rule under a paragraph is gone', r.ruled && r.ruled.border);
   check(r.ruled && r.ruled.background === 'rgba(0, 0, 0, 0)', 'and so is the background it set', r.ruled && r.ruled.background);
   check(r.paged && /^0px none/.test(r.paged.border), 'in the paged view too', r.paged && r.paged.border);
+  check(r.divP && /^0px none/.test(r.divP.border), 'and a paragraph written as a div is ruled no more', r.divP && r.divP.border);
+  check(r.divP && r.divP.background === 'rgba(0, 0, 0, 0)', 'nor given a colour of its own', r.divP && r.divP.background);
+
+  say('\n  a scene break is a mark, not a line across the page\n');
+  check(!!r.hr, 'the book has a scene break', r.hr ? r.hr.w + 'px' : 'none');
+  check(r.hr && r.hr.w < r.hr.page * 0.5, 'it is short, not a rule across the text',
+    r.hr ? r.hr.w + 'px of ' + r.hr.page + 'px (display ' + r.hr.display + ', reader ' + r.hr.readerShown + ', scroll ' + r.hr.scrollShown + ')' : '');
+  check(r.hr && /^(0px|0px)/.test(r.hr.border), 'with no inset border of the browser\'s own',
+    r.hr && r.hr.border);
 
   say('\n  paragraphs are set like a book\n');
   check(r.third && r.third.block === 'block', 'each paragraph starts on its own line', r.third && r.third.block);
