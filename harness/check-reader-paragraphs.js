@@ -107,12 +107,10 @@ app.whenReady().then(async () => {
   check(r.divP && /^0px none/.test(r.divP.border), 'and a paragraph written as a div is ruled no more', r.divP && r.divP.border);
   check(r.divP && r.divP.background === 'rgba(0, 0, 0, 0)', 'nor given a colour of its own', r.divP && r.divP.background);
 
-  say('\n  a scene break is a mark, not a line across the page\n');
+  say('\n  a scene break draws nothing at all\n');
   check(!!r.hr, 'the book has a scene break', r.hr ? r.hr.w + 'px' : 'none');
-  check(r.hr && r.hr.w < r.hr.page * 0.5, 'it is short, not a rule across the text',
-    r.hr ? r.hr.w + 'px of ' + r.hr.page + 'px (display ' + r.hr.display + ', reader ' + r.hr.readerShown + ', scroll ' + r.hr.scrollShown + ')' : '');
-  check(r.hr && /^(0px|0px)/.test(r.hr.border), 'with no inset border of the browser\'s own',
-    r.hr && r.hr.border);
+  check(r.hr && r.hr.display === 'none', 'and it is not drawn', r.hr ? 'display ' + r.hr.display : '');
+  check(r.hr && r.hr.w === 0, 'taking no space either', r.hr ? r.hr.w + 'px' : '');
 
   say('\n  paragraphs are set like a book\n');
   check(r.third && r.third.block === 'block', 'each paragraph starts on its own line', r.third && r.third.block);
@@ -121,8 +119,17 @@ app.whenReady().then(async () => {
   check(r.ownIndent && parseFloat(r.ownIndent.indent) === indent, "a book's own absurd indent is replaced", r.ownIndent && r.ownIndent.indent);
   check(r.first && parseFloat(r.first.indent) === 0, 'the paragraph that opens a section is flush', r.first && r.first.indent);
   check(r.afterBreak && parseFloat(r.afterBreak.indent) === 0, 'and the one after a break too', r.afterBreak && r.afterBreak.indent);
-  check(parseFloat(r.third.margin) > 4, 'with a clear gap between paragraphs', 'margin-bottom: ' + r.third.margin);
+  check(r.third && parseFloat(r.third.margin) === 0, 'with no gap at all between them', 'margin-bottom: ' + r.third.margin);
   check(r.third.align === 'justify', 'and the lines are even at both edges', r.third.align);
+  // and one paragraph sits directly under the last line of the one before it
+  const join = JSON.parse(await win.webContents.executeJavaScript(`(() => {
+    const ps = [...document.querySelectorAll('#epubContent p')];
+    const a = ps[2].getBoundingClientRect(), b = ps[3] ? ps[3].getBoundingClientRect() : null;
+    return JSON.stringify({ firstBottom: Math.round(a.bottom), nextTop: b ? Math.round(b.top) : null });
+  })()`));
+  check(join.nextTop !== null && join.nextTop - join.firstBottom <= 2,
+    'one paragraph starts immediately under the last line of the one before',
+    join.nextTop === null ? 'no next paragraph' : join.nextTop - join.firstBottom + 'px between them');
 
   say('\n  and the two reader views agree\n');
   check(r.paged && r.paged.indent === r.third.indent, 'the paged view indents the same way',

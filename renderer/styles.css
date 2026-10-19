@@ -370,23 +370,21 @@ body {
 }
 #epubContent img { max-width: 100%; height: auto; border-radius: 6px; }
 /* A book marks a break between scenes with <hr>. Left alone the browser draws
-   it as a rule straight across the page, which reads as a line between two
-   paragraphs. Books draw it as a short mark in the middle of the page instead,
-   which is what this does. */
-#epubContent hr, #pagedInner hr {
-  border: 0; width: 22%; margin: 1.6em auto; height: 1px;
-  background: var(--line);
-}
+   it as a rule straight across the page. A printed book does not rule between
+   its paragraphs, and neither does this one: the break is the empty line, and
+   nothing is drawn. */
+#epubContent hr, #pagedInner hr { display: none; }
 
-/* Book paragraphs: each starts on its own line with the first line indented, and
-   nothing runs between one paragraph and the next.
-   The border and background resets are marked important deliberately. A book may
-   carry its own inline styles, and one of those can put a rule under a
-   paragraph, which is not how anybody reads.
+/* Book paragraphs: joined, and split only by the indent.
+   No margin between them and no gap, because a printed book does not leave one
+   - it starts a new line and indents it. Anything drawn between paragraphs is a
+   rule the reader will not allow.
+   The resets are marked important deliberately: a book may carry its own inline
+   styles, and those outrank a stylesheet.
    Both reader views are listed so turning a page sideways does not change how
    the words are set. */
 #epubContent p, #pagedInner p {
-  margin: 0 0 .9em;
+  margin: 0;
   text-indent: 1.4em !important;
   text-align: justify;
   hyphens: auto; -webkit-hyphens: auto;
