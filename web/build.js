@@ -88,10 +88,18 @@ fs.copyFileSync(path.join(ROOT, 'assets', 'icon-header.png'), path.join(SITE, 'a
 // Downloads. The phone app is small enough to serve from here. The Windows
 // installer is over Vercel's 100 MB limit, so its address is set in
 // web/downloads.json and has to point somewhere the file actually lives.
+// The app is kept in downloads/ in the repository, because Vercel builds on its
+// own machines where release/ is not uploaded - an APK that only exists in the
+// build folder makes a download link that 404s the moment anyone visits.
 const downloads = fs.existsSync(path.join(__dirname, 'downloads.json'))
   ? JSON.parse(read(path.join(__dirname, 'downloads.json'))) : {};
 const mb = f => (fs.existsSync(f) ? (fs.statSync(f).size / 1024 / 1024).toFixed(1) + ' MB' : null);
-const apkSrc = path.join(ROOT, 'release', version, `Sailing-Books-${version}.apk`);
+const apkName = `Sailing-Books-${version}.apk`;
+const apkCandidates = [
+  path.join(__dirname, '..', 'downloads', apkName),
+  path.join(ROOT, 'release', version, apkName)
+];
+const apkSrc = apkCandidates.find(f => fs.existsSync(f)) || null;
 const exeSrc = path.join(ROOT, 'release', version, `Sailing-Books-Setup-${version}.exe`);
 
 let apkUrl = downloads.apk || '';
