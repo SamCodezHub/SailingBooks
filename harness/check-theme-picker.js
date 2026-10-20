@@ -1,4 +1,4 @@
-/* Colours and backgrounds are two separate choices.
+/* Colours and backgrounds are two separate choices now.
  *
  * With a couple of hundred palettes, a picker has to be searchable, and picking
  * a colour must not silently change what is behind the text. This checks both,
@@ -38,45 +38,53 @@ app.whenReady().then(async () => {
   await win.webContents.executeJavaScript(`(() => { document.getElementById('btnSettings').click(); return 1; })()`);
   await new Promise(r => setTimeout(r, 500));
   const picker = await win.webContents.executeJavaScript(`(() => {
-    const rows = [...document.querySelectorAll('.theme-card')];
+    const colourRows = [...document.querySelectorAll('#themeColorGrid .theme-card')];
+    const bgRows = [...document.querySelectorAll('#themeBgGrid .theme-card')];
     return JSON.stringify({
-      rows: rows.length,
-      colours: rows.filter(r => r.dataset.kind === 'color').length,
-      bgs: rows.filter(r => r.dataset.kind === 'background').length,
-      groups: [...document.querySelectorAll('.theme-group')].map(g => g.textContent.split(' ')[0]),
+      colours: colourRows.length,
+      bgs: bgRows.length,
+      heads: [...document.querySelectorAll('.set-label')].map(g => g.textContent.trim()),
       hasSearch: !!document.getElementById('themeSearch'),
       count: (document.getElementById('themeCount') || {}).textContent || '',
-      scrolled: getComputedStyle(document.getElementById('themeGrid')).maxHeight
+      scrolled: getComputedStyle(document.getElementById('themeColorGrid')).maxHeight
     });
   })()`);
   const p = JSON.parse(picker);
-  check(p.colours === ui.themes, 'every colour is listed', p.colours + ' rows');
-  check(p.bgs === ui.backgrounds, 'every background is listed', p.bgs + ' rows');
-  check(p.groups.join(',') === 'Colors,Backgrounds', 'under a heading each', p.groups.join(', '));
+  check(p.colours === ui.themes, 'every colour is listed', p.colours + ' colour cards');
+  check(p.bgs === ui.backgrounds, 'every background is listed', p.bgs + ' background cards');
+  check(p.heads.join('|') === 'Theme|Background|Reading|Typeface|Keyboard|About', 'two scrollable lists', p.heads.join('|'));
   check(p.hasSearch, 'with a box to search them');
-  check(/\d+ choices/.test(p.count), 'and a count of what is there', p.count);
-  check(p.scrolled !== 'none', 'the list scrolls rather than running off the panel', p.scrolled);
+  check(/\d+ colours/.test(p.count), 'and a count of what is there', p.count);
+  check(p.scrolled !== 'none', 'the colour list scrolls rather than running off the panel', p.scrolled);
 
-  say('\n  searching\n');
+  say('\n  searching narrows the colour list\n');
   const searched = await win.webContents.executeJavaScript(`(() => {
     const s = document.getElementById('themeSearch');
     s.value = 'ocean';
     s.dispatchEvent(new Event('input', { bubbles: true }));
-    const rows = [...document.querySelectorAll('.theme-card')];
+    const rows = [...document.querySelectorAll('#themeColorGrid .theme-card')];
     const out = { rows: rows.length, names: rows.map(r => r.querySelector('.theme-name').textContent) };
     s.value = 'zzzznothing';
     s.dispatchEvent(new Event('input', { bubbles: true }));
-    out.empty = (document.getElementById('themeGrid').textContent || '').includes('Nothing called');
+    out.empty = document.getElementById('themeColorGrid').children.length === 0;
     s.value = '';
     s.dispatchEvent(new Event('input', { bubbles: true }));
-    out.restored = document.querySelectorAll('.theme-card').length;
+    out.restored = document.querySelectorAll('#themeColorGrid .theme-card').length;
     return JSON.stringify(out);
   })()`);
   const s2 = JSON.parse(searched);
-  check(s2.rows > 0 && s2.rows < p.rows, 'a search narrows the list', s2.rows + ' of ' + p.rows + ' rows');
+  check(s2.rows > 0 && s2.rows < p.colours, 'a search narrows the list', s2.rows + ' of ' + p.colours + ' rows');
   check(s2.names.every(n => /ocean/i.test(n)), 'to names that match', s2.names.join(', '));
   check(s2.empty, 'and says so when nothing matches');
-  check(s2.restored === p.rows, 'clearing it brings the whole list back', s2.restored + ' rows');
+  check(s2.restored === p.colours, 'clearing it brings the whole list back', s2.restored + ' rows');
+
+  say('\n  the typeface grid\n');
+  const fonts = await win.webContents.executeJavaScript(`(() => {
+    const cards = [...document.querySelectorAll('#fontGrid .font-card')];
+    return { rows: cards.length, active: cards.filter(c => c.classList.contains('active')).length };
+  })()`);
+  check(fonts.rows >= 30, 'a big list of typefaces', fonts.rows + ' fonts');
+  check(fonts.active === 1, 'the current font is marked', String(fonts.active));
 
   say('\n  choosing a colour really repaints\n');
   /* Applied and read from separate calls on purpose. The palette is written as

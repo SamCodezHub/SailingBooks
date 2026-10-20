@@ -36,7 +36,9 @@
       <button id="btnAccount" class="account-btn" type="button">Sign in</button>
       <span id="accountPlanPill" class="account-plan-pill hidden"></span>
     </div>
-    <input id="searchInput" type="search" placeholder="Search books…" autocomplete="off" />
+    <div class="search-wrap">
+      <input id="searchInput" type="search" placeholder="Search books…" autocomplete="off" />
+    </div>
     <button id="btnSettings" class="topbar-btn" title="Settings" aria-label="Settings">&#9881;&#xfe0e;</button>
   </header>
 
@@ -50,10 +52,13 @@
     <div class="set-body">
       <section class="set-block">
         <h3 class="set-label">Theme</h3>
-        <div class="set-row"><input id="themeSearch" type="search" placeholder="Search themes and backgrounds…" autocomplete="off" aria-label="Search themes and backgrounds" /><span id="themeCount" class="set-count"></span></div>
-    <div id="themeGrid" class="theme-grid"></div>
+        <div class="set-row"><input id="themeSearch" type="search" placeholder="Search colours…" autocomplete="off" aria-label="Search colours" /><span id="themeCount" class="set-count"></span></div>
+    <div id="themeColorGrid" class="pick-grid"></div>
       </section>
-
+      <section class="set-block">
+        <h3 class="set-label">Background</h3>
+    <div id="themeBgGrid" class="pick-grid"></div>
+      </section>
       <section class="set-block">
         <h3 class="set-label">Reading</h3>
         <div class="set-row">
@@ -64,22 +69,15 @@
             <button id="setFontUp" class="icon-btn" title="Larger text">+</button>
           </div>
         </div>
-        <label class="set-row">
-          <span>Typeface</span>
-          <select id="setFontFamily">
-            <option value="Georgia, 'Times New Roman', serif">Serif (Georgia)</option>
-            <option value="'Segoe UI', system-ui, sans-serif">Sans (system)</option>
-            <option value="'Iowan Old Style', 'Palatino Linotype', Palatino, serif">Old style</option>
-            <option value="'Trebuchet MS', 'Segoe UI', sans-serif">Humanist</option>
-            <option value="ui-monospace, 'Cascadia Mono', Consolas, monospace">Monospace</option>
-          </select>
-        </label>
+        <h3 class="set-label">Typeface</h3>
+    <div id="fontGrid" class="font-grid"></div>
+        <select id="setFontFamily" class="hidden" aria-hidden="true"></select>
         <label class="set-row">
           <span>Line spacing</span>
           <select id="setLineHeight">
             <option value="1.3">Tight</option>
-            <option value="1.5"> snug</option>
-            <option value="1.7">Normal</option>
+            <option value="1.5">Snug</option>
+            <option value="1.7" selected>Normal</option>
             <option value="1.95">Relaxed</option>
             <option value="2.3">Very relaxed</option>
           </select>

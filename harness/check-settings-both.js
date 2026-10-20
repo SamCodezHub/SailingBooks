@@ -47,8 +47,7 @@ app.whenReady().then(async () => {
       await sleep(300);
       const p = document.getElementById('settingsPanel');
       const box = p.getBoundingClientRect();
-      const grid = document.getElementById('themeGrid');
-      const cards = [...document.querySelectorAll('.theme-card')];
+      const cards = [...document.querySelectorAll('#themeColorGrid .theme-card, #themeBgGrid .theme-card')];
       const rect = cards[0] ? cards[0].getBoundingClientRect() : { width: 0, height: 0 };
       // measure before tapping: tapping rebuilds the grid, so the node measured
       // afterwards would be a detached one reporting a zero rect
@@ -61,14 +60,13 @@ app.whenReady().then(async () => {
       // reports the previous theme. check-contrast.js measures what is actually
       // painted, in all 243 of them, against a window that does paint.
       const before = document.documentElement.getAttribute('data-theme');
-      const dark = [...document.querySelectorAll('.theme-card')].find(c => c.textContent.includes('Dusk'));
+      const dark = [...document.querySelectorAll('#themeColorGrid .theme-card, #themeBgGrid .theme-card')].find(c => c.textContent.includes('Dusk'));
       if (dark) dark.click();
       await sleep(300);
       return {
         opensOnTap: !p.classList.contains('hidden'),
         fullWidth: Math.round(box.width) >= window.innerWidth - 1,
         cardCount: cards.length,
-        gridWidth: grid ? Math.round(grid.getBoundingClientRect().width) : null,
         cardSize: size.w,
         // a row in a list rather than a card: it has to be wide enough to read
         // and tall enough to tap with a thumb
@@ -107,10 +105,10 @@ app.whenReady().then(async () => {
     const sleep = (ms) => new Promise(x => setTimeout(x, ms));
     document.getElementById('btnSettings').click();
     await sleep(250);
-    const cards = document.querySelectorAll('.theme-card').length;
-    const ocean = [...document.querySelectorAll('.theme-card')].find(c => c.textContent.includes('Ocean'));
+    const cards = document.querySelectorAll('#themeColorGrid .theme-card, #themeBgGrid .theme-card').length;
+    const ocean = [...document.querySelectorAll('#themeColorGrid .theme-card, #themeBgGrid .theme-card')].find(c => c.textContent.includes('Ocean'));
     ocean.click();
-    await sleep(250);
+    await sleep(400);
     // The palette is written as custom properties on the document, and the page
     // only catches up when it recalculates. Reading in the same breath reports
     // the theme that was on before.

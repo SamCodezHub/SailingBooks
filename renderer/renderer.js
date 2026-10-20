@@ -2154,6 +2154,52 @@ const THEMES = window.SB_THEMES || [];
 const BACKGROUNDS = window.SB_BACKGROUNDS || [];
 const THEME_IDS = THEMES.map(t => t.id);
 
+/* About forty typefaces for the reader - the system fallbacks, a stack of serifs,
+ * sans-serifs and monospaces, and a few favourites people actually ask for. */
+const FONT_FACES = [
+  'Georgia, \'Times New Roman\', serif',
+  '\'Iowan Old Style\', \'Palatino Linotype\', Palatino, serif',
+  '\'Playfair Display\', serif',
+  '\'Merriweather\', serif',
+  '\'Libre Baskerville\', serif',
+  '\'Lora\', serif',
+  '\'PT Serif\', serif',
+  '\'Cormorant Garamond\', serif',
+  '\'Spectral\', serif',
+  '\'Crimson Pro\', serif',
+  '\'EB Garamond\', serif',
+  '\'Noto Serif\', serif',
+  '\'Source Serif Pro\', serif',
+  'Cambria, serif',
+  'Rockwell, serif',
+  '\'Segoe UI\', system-ui, sans-serif',
+  'Inter, sans-serif',
+  '\'Helvetica Neue\', Helvetica, Arial, sans-serif',
+  'Roboto, sans-serif',
+  '\'Open Sans\', sans-serif',
+  'Lato, sans-serif',
+  'Montserrat, sans-serif',
+  'Poppins, sans-serif',
+  'Raleway, sans-serif',
+  '\'Source Sans Pro\', sans-serif',
+  'Noto Sans, sans-serif',
+  '\'Fira Sans\', sans-serif',
+  'Ubuntu, sans-serif',
+  'Cantarell, sans-serif',
+  '\'Trebuchet MS\', \'Segoe UI\', sans-serif',
+  'Verdana, Geneva, sans-serif',
+  'ui-monospace, \'Cascadia Mono\', Consolas, monospace',
+  '\'Courier New\', Courier, monospace',
+  '\'Fira Code\', monospace',
+  '\'Roboto Mono\', monospace',
+  '\'Source Code Pro\', monospace',
+  '\'JetBrains Mono\', monospace',
+  '\'Ubuntu Mono\', monospace',
+  '\'Space Mono\', monospace',
+  'Inconsolata, monospace',
+  'Hack, monospace'
+];
+
 function applyTheme(name) {
   const theme = window.SB_findTheme?.(name) || THEMES[0];
   if (!theme) return;
@@ -2165,8 +2211,16 @@ function applyTheme(name) {
   for (const [prop, value] of Object.entries(theme.vars || {})) {
     document.documentElement.style.setProperty(prop, value);
   }
+  applyThemeBody(theme);
   syncThemeColor();
   syncTitleBar(theme);
+}
+
+/* Painting the page background directly on the body so the repaint cannot be
+ * swallowed by a transition or by a rule that sits above --bg in the cascade. */
+function applyThemeBody(theme) {
+  const bg = theme.vars && theme.vars['--bg'];
+  if (bg) document.body.style.backgroundColor = bg;
 }
 
 /* On the desktop the app's bar is also the title bar, and Windows keeps its
@@ -2261,81 +2315,105 @@ function enterView(view) {
   }, { once: true });
 }
 
-/* The picker: a search box, then the colours, then the backgrounds. A couple of
- * hundred themes is too many to look at at once, and too many to scroll past. */
-function buildThemeGrid() {
-  const grid = $('#themeGrid');
-  if (!grid) return;
-  const query = ($('#themeSearch')?.value || '').trim().toLowerCase();
-  const matches = item => !query || item.name.toLowerCase().includes(query);
-  const pick = (list, selectedId, kind, swatches) => list.filter(matches).map(item => {
+/* Colours and backgrounds each get their own scrollable list in settings.
+ * The search box only filters colours - backgrounds stay where they were. */
+function pickTheme(list, selectedId, swatches, onPick) {
+  return list.map(item => {
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'theme-card' + (selectedId === item.id ? ' active' : '');
-    row.dataset.kind = kind;
     row.dataset.id = item.id;
     row.title = item.name;
-    row.setAttribute('aria-label', item.name + ' ' + kind);
-    row.setAttribute('aria-pressed', String(selectedId === item.id));
     row.innerHTML =
       '<span class="theme-name">' + escapeHtml(item.name) + '</span>' +
       '<span class="theme-swatches">' +
         swatches(item).map(c => `<i style="background:${c}"></i>`).join('') +
       '</span>';
     row.onclick = () => {
-      if (kind === 'color') { applyTheme(item.id); applyBackground(state.settings.background); }
-      else applyBackground(item.id);
+      onPick(item.id);
       save();
-      buildThemeGrid();
+      buildColorGrid();
+      buildBackgroundGrid();
     };
     return row;
   });
-
+}
+function buildColorGrid() {
+  const grid = $('#themeColorGrid');
+  if (!grid) return;
+  const query = ($('#themeSearch')?.value || '').trim().toLowerCase();
   grid.innerHTML = '';
-  const groups = [
-    { key: 'color', label: 'Colors', list: THEMES, selected: state.settings.theme, sw: t => t.sw },
-    { key: 'background', label: 'Backgrounds', list: BACKGROUNDS, selected: state.settings.background, sw: b => ['var(--swatch-a)', 'var(--swatch-b)'] }
-  ];
   let shown = 0;
-  for (const g of groups) {
-    const rows = pick(g.list, g.selected, g.key, g.sw);
-    if (!rows.length) continue;
-    shown += rows.length;
-    const head = document.createElement('div');
-    head.className = 'theme-group';
-    head.textContent = g.label + (rows.length < g.list.length ? ' (' + rows.length + ' of ' + g.list.length + ')' : '');
-    grid.appendChild(head);
-    for (const row of rows) grid.appendChild(row);
-  }
-  if (!shown) {
-    const none = document.createElement('div');
-    none.className = 'theme-empty';
-    none.textContent = 'Nothing called “' + ($('#themeSearch')?.value || '') + '”.';
-    grid.appendChild(none);
+  for (const t of THEMES) {
+    if (query && !t.name.toLowerCase().includes(query)) continue;
+    grid.appendChild(pickTheme([t], state.settings.theme, t => t.sw, id => applyTheme(id))[0]);
+    shown++;
   }
   const count = $('#themeCount');
-  if (count) {
-    const total = THEMES.length + BACKGROUNDS.length;
-    count.textContent = query ? shown + ' of ' + total : total + ' choices';
+  if (count) count.textContent = query ? shown + ' colours of ' + THEMES.length : THEMES.length + ' colours';
+}
+function buildBackgroundGrid() {
+  const grid = $('#themeBgGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (const b of BACKGROUNDS) {
+    grid.appendChild(pickTheme([b], state.settings.background, b => ['var(--swatch-a)', 'var(--swatch-b)'], id => applyBackground(id))[0]);
+  }
+}
+/* The typeface grid: one card per font, each drawn in its own face. */
+function buildFontGrid() {
+  const grid = $('#fontGrid');
+  if (!grid) return;
+  const sel = state.settings.fontFamily || '';
+  grid.innerHTML = '';
+  for (const f of FONT_FACES) {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'font-card' + (sel === f ? ' active' : '');
+    card.dataset.font = f;
+    card.style.fontFamily = f;
+    card.innerHTML = '<span class="font-sample">Aa</span><span class="font-name">' + escapeHtml(f) + '</span>';
+    card.onclick = () => {
+      state.settings.fontFamily = f;
+      save();
+      applyReaderStyle();
+      buildFontGrid();
+      const fam = $('#setFontFamily');
+      if (fam) fam.value = f;
+    };
+    grid.appendChild(card);
   }
 }
 
 /* A handle on the two lists and the two functions that apply them. The checks
  * drive these directly rather than clicking through a couple of hundred rows to
  * confirm every palette is readable, and it is handy in the console. */
-window.SB_ui = { applyTheme, applyBackground, themes: THEMES, backgrounds: BACKGROUNDS, buildThemeGrid };
+window.SB_ui = { applyTheme, applyBackground, themes: THEMES, backgrounds: BACKGROUNDS, buildColorGrid, buildBackgroundGrid, buildFontGrid };
 
 function syncSettingsUI() {
-  buildThemeGrid();  const search = $('#themeSearch');
+  buildColorGrid(); buildBackgroundGrid(); buildFontGrid();  const search = $('#themeSearch');
   if (search && !search.dataset.wired) {
     search.dataset.wired = '1';
-    search.addEventListener('input', buildThemeGrid);
-    search.addEventListener('keydown', (e) => { if (e.key === 'Escape') { search.value = ''; buildThemeGrid(); } });
+    search.addEventListener('input', buildColorGrid);
+    search.addEventListener('keydown', (e) => { if (e.key === 'Escape') { search.value = ''; buildColorGrid(); } });
   }
   const size = $('#setFontSize');
   if (size) size.textContent = state.settings.fontSize + 'px';
   const fam = $('#setFontFamily');
-  if (fam) fam.value = state.settings.fontFamily;
+  if (fam) {
+    if (!fam.options.length) {
+      for (const f of FONT_FACES) {
+        const o = document.createElement('option');
+        o.value = f; o.textContent = f;
+        fam.appendChild(o);
+      }
+    }
+    fam.value = state.settings.fontFamily || '';
+    if (!fam.dataset.wired) {
+      fam.dataset.wired = '1';
+      fam.onchange = (e) => { captureEpubProgress(); state.settings.fontFamily = e.target.value; save(); applyReaderStyle(); buildFontGrid(); };
+    }
+  }
   const lh = $('#setLineHeight');
   if (lh) lh.value = String(state.settings.lineHeight);
 }
@@ -2976,7 +3054,7 @@ $('#btnSettingsClose').onclick = closeSettings;
 $('#settingsScrim').onclick = closeSettings;
 $('#setFontDown').onclick = () => { changeFontSize(-1); syncSettingsUI(); };
 $('#setFontUp').onclick = () => { changeFontSize(1); syncSettingsUI(); };
-$('#setFontFamily').onchange = (e) => { captureEpubProgress(); state.settings.fontFamily = e.target.value; save(); applyReaderStyle(); };
+
 $('#setLineHeight').onchange = (e) => { captureEpubProgress(); state.settings.lineHeight = e.target.value; save(); applyReaderStyle(); };
 $('#setResetTheme').onclick = () => { applyTheme('light'); save(); syncSettingsUI(); toast('Appearance reset'); };
 // Clicking the page behind the panel is not how you dismiss it, but on the
