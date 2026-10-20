@@ -104,6 +104,7 @@ const BAR_RIGHT = `JSON.stringify((() => {
     gapNamePill: p.l - n.r,
     gapPillSearch: s.l - p.r,
     accountLeftOfSearch: p.r <= s.l,
+    searchCentered: Math.abs((s.l + s.r) / 2 - bar.right / 2) < 80,
     searchLeftOfGear: s.r <= g.l
   };
 })())`;
@@ -187,7 +188,7 @@ app.whenReady().then(async () => {
   check(!acct.gearInStrip, 'and the gear is clear of them', 'gear ends ' + acct.gear.r + ', strip starts ' + acct.stripLeft);
   check(acct.gapPillGear >= 6, 'with room between the plan and the gear', acct.gapPillGear + 'px between them');
   check(acct.gapNamePill >= 4, 'and between the name and the plan', acct.gapNamePill + 'px');
-  check(acct.accountLeftOfSearch, 'account is immediately left of the search', 'account ends ' + acct.pill.r + ', search starts ' + acct.search.l);
+  check(acct.searchCentered, 'the search is centred in the bar', 'centre ' + Math.round((acct.search.l + acct.search.r) / 2) + ' of ' + Math.round(acct.barRight / 2));
   check(acct.searchLeftOfGear, 'search is left of the window buttons', 'search ends ' + acct.search.r + ', gear starts ' + acct.gear.l);
 
   say('\n  and neither does the settings drawer\n');

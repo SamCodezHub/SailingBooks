@@ -157,11 +157,14 @@ body {
 /* Top bar â€” the search field, and the settings button tucked into the corner so
    the field can stay optically centred. */
 #topbar {
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center;
   padding: 10px 22px;
   background: var(--panel);
   position: relative;
   user-select: none;
+}
+.search-wrap {
+  position: absolute; left: 50%; transform: translateX(-50%);
 }
 #btnSettings {
   position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
@@ -326,6 +329,7 @@ body {
 #readerTitleWrap { flex: 1; min-width: 0; }
 #readerTitle { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #readerMeta { font-size: 12px; color: var(--muted); }
+#readerControls { margin-left: auto; }
 #readerControls .font-group { display: flex; align-items: center; gap: 7px; }
 
 /* Phone: the reader bar has more controls than fits, so the title keeps the
@@ -971,7 +975,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
    account and its plan badge are wrapped together and that gap is reserved
    once, for both. Putting the badge outside this used to push it under the
    gear. */
-.account-group { display:flex; align-items:center; gap:8px; margin-right:48px; }
+.account-group { display:flex; align-items:center; gap:8px; margin-left:auto; margin-right:60px; }
 .account-btn { margin-left:0; margin-right:0; border:1px solid var(--line); border-radius:999px; padding:8px 13px; color:var(--ink); background:var(--panel); font-size:12px; font-weight:650; cursor:pointer; transition:all .18s ease; white-space:nowrap; }
 .account-btn:hover { border-color:var(--accent); transform:translateY(-1px); }
 #btnSettings { right:14px; }
@@ -996,7 +1000,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   -webkit-app-region: no-drag; app-region: no-drag;
 }
 #topbar { padding-right: calc(22px + var(--caption-reserve)); }
-.account-group { margin-right: 16px; }
 #btnSettings { right: calc(14px + var(--caption-reserve)); }
 #readerBar { padding-right: calc(20px + var(--caption-reserve)); min-height: 62px; box-sizing: border-box; }
 /* The drawer opens over the top-right corner, where the window buttons are, so
