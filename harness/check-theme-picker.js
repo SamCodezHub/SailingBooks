@@ -38,53 +38,50 @@ app.whenReady().then(async () => {
   await win.webContents.executeJavaScript(`(() => { document.getElementById('btnSettings').click(); return 1; })()`);
   await new Promise(r => setTimeout(r, 500));
   const picker = await win.webContents.executeJavaScript(`(() => {
-    const colourRows = [...document.querySelectorAll('#themeColorGrid .theme-card')];
-    const bgRows = [...document.querySelectorAll('#themeBgGrid .theme-card')];
+    const colourOpts = [...document.querySelectorAll('#themeColorSelect option')];
+    const bgOpts = [...document.querySelectorAll('#themeBgSelect option')];
     return JSON.stringify({
-      colours: colourRows.length,
-      bgs: bgRows.length,
+      colours: colourOpts.length,
+      bgs: bgOpts.length,
       heads: [...document.querySelectorAll('.set-label')].map(g => g.textContent.trim()),
-      hasSearch: !!document.getElementById('themeSearch'),
-      count: (document.getElementById('themeCount') || {}).textContent || '',
-      scrolled: getComputedStyle(document.getElementById('themeColorGrid')).maxHeight
+      colourValue: (document.getElementById('themeColorSelect') || {}).value || '',
+      bgValue: (document.getElementById('themeBgSelect') || {}).value || ''
     });
   })()`);
   const p = JSON.parse(picker);
-  check(p.colours === ui.themes, 'every colour is listed', p.colours + ' colour cards');
-  check(p.bgs === ui.backgrounds, 'every background is listed', p.bgs + ' background cards');
-  check(p.heads.join('|') === 'Theme|Background|Reading|Typeface|Keyboard|About', 'two scrollable lists', p.heads.join('|'));
-  check(p.hasSearch, 'with a box to search them');
-  check(/\d+ colours/.test(p.count), 'and a count of what is there', p.count);
-  check(p.scrolled !== 'none', 'the colour list scrolls rather than running off the panel', p.scrolled);
+  check(p.colours === ui.themes, 'every colour is in the dropdown', p.colours + ' options');
+  check(p.bgs === ui.backgrounds, 'every background is in the dropdown', p.bgs + ' options');
+  check(p.heads.join('|') === 'Theme|Background|Reading|Keyboard|About', 'the sections are in order', p.heads.join('|'));
+  check(p.colourValue.length > 0, 'a colour is selected', p.colourValue);
+  check(p.bgValue.length > 0, 'and a background is selected', p.bgValue);
 
-  say('\n  searching narrows the colour list\n');
-  const searched = await win.webContents.executeJavaScript(`(() => {
-    const s = document.getElementById('themeSearch');
-    s.value = 'ocean';
-    s.dispatchEvent(new Event('input', { bubbles: true }));
-    const rows = [...document.querySelectorAll('#themeColorGrid .theme-card')];
-    const out = { rows: rows.length, names: rows.map(r => r.querySelector('.theme-name').textContent) };
-    s.value = 'zzzznothing';
-    s.dispatchEvent(new Event('input', { bubbles: true }));
-    out.empty = document.getElementById('themeColorGrid').children.length === 0;
-    s.value = '';
-    s.dispatchEvent(new Event('input', { bubbles: true }));
-    out.restored = document.querySelectorAll('#themeColorGrid .theme-card').length;
-    return JSON.stringify(out);
+  say('\n  choosing from the dropdowns\n');
+  const chosen = await win.webContents.executeJavaScript(`(() => {
+    const c = document.getElementById('themeColorSelect');
+    const b = document.getElementById('themeBgSelect');
+    const read = () => ({
+      theme: document.documentElement.getAttribute('data-theme'),
+      bg: document.documentElement.getAttribute('data-background'),
+      cval: c.value, bval: b.value
+    });
+    c.value = 'ocean'; c.dispatchEvent(new Event('change'));
+    const afterColour = read();
+    b.value = 'diagonal'; b.dispatchEvent(new Event('change'));
+    const afterBg = read();
+    return JSON.stringify({ afterColour, afterBg });
   })()`);
-  const s2 = JSON.parse(searched);
-  check(s2.rows > 0 && s2.rows < p.colours, 'a search narrows the list', s2.rows + ' of ' + p.colours + ' rows');
-  check(s2.names.every(n => /ocean/i.test(n)), 'to names that match', s2.names.join(', '));
-  check(s2.empty, 'and says so when nothing matches');
-  check(s2.restored === p.colours, 'clearing it brings the whole list back', s2.restored + ' rows');
+  const ch = JSON.parse(chosen);
+  check(ch.afterColour.theme === 'ocean', 'picking a colour repaints the app', ch.afterColour.theme);
+  check(ch.afterBg.bg === 'diagonal', 'picking a background applies it', ch.afterBg.bg);
+  check(ch.afterBg.theme === 'ocean', 'and the colour stays the same', ch.afterBg.theme);
 
-  say('\n  the typeface grid\n');
+  say('\n  the typeface dropdown\n');
   const fonts = await win.webContents.executeJavaScript(`(() => {
-    const cards = [...document.querySelectorAll('#fontGrid .font-card')];
-    return { rows: cards.length, active: cards.filter(c => c.classList.contains('active')).length };
+    const sel = document.getElementById('setFontFamily');
+    return { options: sel.options.length, value: sel.value };
   })()`);
-  check(fonts.rows >= 30, 'a big list of typefaces', fonts.rows + ' fonts');
-  check(fonts.active === 1, 'the current font is marked', String(fonts.active));
+  check(fonts.options >= 30, 'a big list of typefaces', fonts.options + ' fonts');
+  check(fonts.value.length > 0, 'a font is selected', fonts.value.slice(0, 40));
 
   say('\n  choosing a colour really repaints\n');
   /* Applied and read from separate calls on purpose. The palette is written as

@@ -2316,74 +2316,43 @@ function enterView(view) {
   }, { once: true });
 }
 
-/* Colours and backgrounds each get their own scrollable list in settings.
- * The search box only filters colours - backgrounds stay where they were. */
-function pickTheme(list, selectedId, swatches, onPick) {
-  return list.map(item => {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'theme-card' + (selectedId === item.id ? ' active' : '');
-    row.dataset.id = item.id;
-    row.title = item.name;
-    row.innerHTML =
-      '<span class="theme-name">' + escapeHtml(item.name) + '</span>' +
-      '<span class="theme-swatches">' +
-        swatches(item).map(c => `<i style="background:${c}"></i>`).join('') +
-      '</span>';
-    row.onclick = () => {
-      onPick(item.id);
-      save();
-      buildColorGrid();
-      buildBackgroundGrid();
-    };
-    return row;
-  });
-}
+/* Colour, background and typeface are each a single dropdown now rather than
+ * a scrollable grid — the panel had three independent scroll bars. */
 function buildColorGrid() {
-  const grid = $('#themeColorGrid');
-  if (!grid) return;
-  const query = ($('#themeSearch')?.value || '').trim().toLowerCase();
-  grid.innerHTML = '';
-  let shown = 0;
+  const sel = $('#themeColorSelect');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '';
   for (const t of THEMES) {
-    if (query && !t.name.toLowerCase().includes(query)) continue;
-    grid.appendChild(pickTheme([t], state.settings.theme, t => t.sw, id => applyTheme(id))[0]);
-    shown++;
+    const o = document.createElement('option');
+    o.value = t.id; o.textContent = t.name;
+    sel.appendChild(o);
   }
-  const count = $('#themeCount');
-  if (count) count.textContent = query ? shown + ' colours of ' + THEMES.length : THEMES.length + ' colours';
+  sel.value = state.settings.theme || prev || THEMES[0].id;
 }
 function buildBackgroundGrid() {
-  const grid = $('#themeBgGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
+  const sel = $('#themeBgSelect');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '';
   for (const b of BACKGROUNDS) {
-    grid.appendChild(pickTheme([b], state.settings.background, b => ['var(--swatch-a)', 'var(--swatch-b)'], id => applyBackground(id))[0]);
+    const o = document.createElement('option');
+    o.value = b.id; o.textContent = b.name;
+    sel.appendChild(o);
   }
+  sel.value = state.settings.background || prev || BACKGROUNDS[0].id;
 }
-/* The typeface grid: one card per font, each drawn in its own face. */
 function buildFontGrid() {
-  const grid = $('#fontGrid');
-  if (!grid) return;
-  const sel = state.settings.fontFamily || '';
-  grid.innerHTML = '';
+  const sel = $('#setFontFamily');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '';
   for (const f of FONT_FACES) {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'font-card' + (sel === f ? ' active' : '');
-    card.dataset.font = f;
-    card.style.fontFamily = f;
-    card.innerHTML = '<span class="font-sample">Aa</span><span class="font-name">' + escapeHtml(f) + '</span>';
-    card.onclick = () => {
-      state.settings.fontFamily = f;
-      save();
-      applyReaderStyle();
-      buildFontGrid();
-      const fam = $('#setFontFamily');
-      if (fam) fam.value = f;
-    };
-    grid.appendChild(card);
+    const o = document.createElement('option');
+    o.value = f; o.textContent = f;
+    sel.appendChild(o);
   }
+  sel.value = state.settings.fontFamily || prev || FONT_FACES[0];
 }
 
 /* A handle on the two lists and the two functions that apply them. The checks
@@ -2392,28 +2361,23 @@ function buildFontGrid() {
 window.SB_ui = { applyTheme, applyBackground, themes: THEMES, backgrounds: BACKGROUNDS, buildColorGrid, buildBackgroundGrid, buildFontGrid };
 
 function syncSettingsUI() {
-  buildColorGrid(); buildBackgroundGrid(); buildFontGrid();  const search = $('#themeSearch');
-  if (search && !search.dataset.wired) {
-    search.dataset.wired = '1';
-    search.addEventListener('input', buildColorGrid);
-    search.addEventListener('keydown', (e) => { if (e.key === 'Escape') { search.value = ''; buildColorGrid(); } });
+  buildColorGrid(); buildBackgroundGrid(); buildFontGrid();
+  const colour = $('#themeColorSelect');
+  if (colour && !colour.dataset.wired) {
+    colour.dataset.wired = '1';
+    colour.onchange = () => { applyTheme(colour.value); save(); buildBackgroundGrid(); };
+  }
+  const bg = $('#themeBgSelect');
+  if (bg && !bg.dataset.wired) {
+    bg.dataset.wired = '1';
+    bg.onchange = () => { applyBackground(bg.value); save(); };
   }
   const size = $('#setFontSize');
   if (size) size.textContent = state.settings.fontSize + 'px';
   const fam = $('#setFontFamily');
-  if (fam) {
-    if (!fam.options.length) {
-      for (const f of FONT_FACES) {
-        const o = document.createElement('option');
-        o.value = f; o.textContent = f;
-        fam.appendChild(o);
-      }
-    }
-    fam.value = state.settings.fontFamily || '';
-    if (!fam.dataset.wired) {
-      fam.dataset.wired = '1';
-      fam.onchange = (e) => { captureEpubProgress(); state.settings.fontFamily = e.target.value; save(); applyReaderStyle(); buildFontGrid(); };
-    }
+  if (fam && !fam.dataset.wired) {
+    fam.dataset.wired = '1';
+    fam.onchange = (e) => { captureEpubProgress(); state.settings.fontFamily = e.target.value; save(); applyReaderStyle(); };
   }
   const lh = $('#setLineHeight');
   if (lh) lh.value = String(state.settings.lineHeight);

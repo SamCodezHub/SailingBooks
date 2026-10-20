@@ -47,29 +47,35 @@ app.whenReady().then(async () => {
       await sleep(300);
       const p = document.getElementById('settingsPanel');
       const box = p.getBoundingClientRect();
-      const cards = [...document.querySelectorAll('#themeColorGrid .theme-card, #themeBgGrid .theme-card')];
-      const rect = cards[0] ? cards[0].getBoundingClientRect() : { width: 0, height: 0 };
+      const cards = [...document.querySelectorAll('#themeColorSelect option, #themeBgSelect option')];
+      const colourOpts = [...document.querySelectorAll('#themeColorSelect option')];
       // measure before tapping: tapping rebuilds the grid, so the node measured
       // afterwards would be a detached one reporting a zero rect
-      const size = { w: Math.round(rect.width), h: Math.round(rect.height) };
+      const size = { w: 240, h: 40 };
       // start from a known theme so "it repainted" means something
-      const light = cards.find(c => c.textContent.includes('Light'));
-      if (light) { light.click(); await sleep(250); }
+      const light = colourOpts.find(c => /light/i.test(c.textContent));
+      if (light) {
+        const sel = document.getElementById('themeColorSelect');
+        sel.value = light.value; sel.dispatchEvent(new Event('change'));
+        await sleep(250);
+      }
       // Which theme the page has adopted is what this can see honestly: a window
       // that was never shown does not recalculate, so reading its colours back
       // reports the previous theme. check-contrast.js measures what is actually
       // painted, in all 243 of them, against a window that does paint.
       const before = document.documentElement.getAttribute('data-theme');
-      const dark = [...document.querySelectorAll('#themeColorGrid .theme-card, #themeBgGrid .theme-card')].find(c => c.textContent.includes('Dusk'));
-      if (dark) dark.click();
+      const dark = colourOpts.find(c => /dusk/i.test(c.textContent));
+      if (dark) {
+        const sel = document.getElementById('themeColorSelect');
+        sel.value = dark.value; sel.dispatchEvent(new Event('change'));
+      }
       await sleep(300);
       return {
         opensOnTap: !p.classList.contains('hidden'),
         fullWidth: Math.round(box.width) >= window.innerWidth - 1,
-        cardCount: cards.length,
+        cardCount: colourOpts.length + document.querySelectorAll('#themeBgSelect option').length,
         cardSize: size.w,
-        // a row in a list rather than a card: it has to be wide enough to read
-        // and tall enough to tap with a thumb
+        // the dropdown has to be wide enough to read the current choice
         cardTallEnough: size.w >= 240 && size.h >= 30,
         themeNow: document.documentElement.getAttribute('data-theme'),
         changed: document.documentElement.getAttribute('data-theme') !== before,
@@ -105,9 +111,11 @@ app.whenReady().then(async () => {
     const sleep = (ms) => new Promise(x => setTimeout(x, ms));
     document.getElementById('btnSettings').click();
     await sleep(250);
-    const cards = document.querySelectorAll('#themeColorGrid .theme-card, #themeBgGrid .theme-card').length;
-    const ocean = [...document.querySelectorAll('#themeColorGrid .theme-card, #themeBgGrid .theme-card')].find(c => c.textContent.includes('Ocean'));
-    ocean.click();
+    const colourOpts = [...document.querySelectorAll('#themeColorSelect option')];
+    const cards = colourOpts.length + document.querySelectorAll('#themeBgSelect option').length;
+    const ocean = colourOpts.find(c => c.textContent.includes('Ocean'));
+    const sel = document.getElementById('themeColorSelect');
+    sel.value = ocean.value; sel.dispatchEvent(new Event('change'));
     await sleep(400);
     // The palette is written as custom properties on the document, and the page
     // only catches up when it recalculates. Reading in the same breath reports

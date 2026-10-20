@@ -52,12 +52,17 @@
     <div class="set-body">
       <section class="set-block">
         <h3 class="set-label">Theme</h3>
-        <div class="set-row"><input id="themeSearch" type="search" placeholder="Search colours…" autocomplete="off" aria-label="Search colours" /><span id="themeCount" class="set-count"></span></div>
-    <div id="themeColorGrid" class="pick-grid"></div>
+        <div class="set-row">
+          <span>Colour</span>
+          <select id="themeColorSelect"></select>
+        </div>
       </section>
       <section class="set-block">
         <h3 class="set-label">Background</h3>
-    <div id="themeBgGrid" class="pick-grid"></div>
+        <div class="set-row">
+          <span>Effect</span>
+          <select id="themeBgSelect"></select>
+        </div>
       </section>
       <section class="set-block">
         <h3 class="set-label">Reading</h3>
@@ -69,9 +74,10 @@
             <button id="setFontUp" class="icon-btn" title="Larger text">+</button>
           </div>
         </div>
-        <h3 class="set-label">Typeface</h3>
-    <div id="fontGrid" class="font-grid"></div>
-        <select id="setFontFamily" class="hidden" aria-hidden="true"></select>
+        <div class="set-row">
+          <span>Typeface</span>
+          <select id="setFontFamily"></select>
+        </div>
         <label class="set-row">
           <span>Line spacing</span>
           <select id="setLineHeight">
