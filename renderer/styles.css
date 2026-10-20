@@ -755,7 +755,7 @@ kbd {
   position: relative; overflow: hidden; transition: border-color .15s, box-shadow .15s, transform .1s;
   user-select: none; width: 100%;
 }
-.font-card .font-sample { font-size: 20px; line-height: 1; overflow: hidden; }
+.font-card .font-sample { font-family: inherit; font-size: 20px; line-height: 1; overflow: hidden; }
 .font-card .font-name { font-size: 11px; line-height: 1.3; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
 .font-card:hover { box-shadow: var(--shadow); }

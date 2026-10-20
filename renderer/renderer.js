@@ -2212,6 +2212,7 @@ function applyTheme(name) {
     document.documentElement.style.setProperty(prop, value);
   }
   applyThemeBody(theme);
+  applyBackground(state.settings.background);
   syncThemeColor();
   syncTitleBar(theme);
 }
