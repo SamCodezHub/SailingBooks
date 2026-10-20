@@ -2328,7 +2328,7 @@ function buildColorGrid() {
     o.value = t.id; o.textContent = t.name;
     // Native <option> elements cannot hold child nodes or borders in Chromium,
     // but they do honour background-color — so each row wears its own colour.
-    const sw = (t.sw && t.sw[2]) || (t.sw && t.sw[0]) || '#888888';
+    const sw = (t.sw && t.sw[0]) || '#888888';
     o.style.backgroundColor = sw;
     o.style.color = (window.SB_contrast && window.SB_contrast(sw, '#000000') >= 4.5) ? '#000000' : '#ffffff';
     sel.appendChild(o);
