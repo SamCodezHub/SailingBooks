@@ -54,7 +54,14 @@
         <h3 class="set-label">Theme</h3>
         <div class="set-row">
           <span>Colour</span>
-          <select id="themeColorSelect"></select>
+          <div class="dd" id="colourDd">
+            <button type="button" class="dd-toggle" id="colourToggle" aria-haspopup="listbox" aria-expanded="false">
+              <span class="dd-name" id="colourToggleName"></span>
+              <span class="dd-pill" id="colourTogglePill"></span>
+            </button>
+            <div class="dd-menu hidden" id="colourMenu" role="listbox" aria-label="Colour"></div>
+          </div>
+          <select id="themeColorSelect" class="hidden" aria-hidden="true" tabindex="-1"></select>
         </div>
       </section>
       <section class="set-block">

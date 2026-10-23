@@ -2326,14 +2326,68 @@ function buildColorGrid() {
   for (const t of THEMES) {
     const o = document.createElement('option');
     o.value = t.id; o.textContent = t.name;
-    // Native <option> elements cannot hold child nodes or borders in Chromium,
-    // but they do honour background-color — so each row wears its own colour.
-    const sw = (t.sw && t.sw[0]) || '#888888';
-    o.style.backgroundColor = sw;
-    o.style.color = (window.SB_contrast && window.SB_contrast(sw, '#000000') >= 4.5) ? '#000000' : '#ffffff';
     sel.appendChild(o);
   }
   sel.value = state.settings.theme || prev || THEMES[0].id;
+  buildColourMenu();
+  syncColourToggle();
+}
+function colourSwatches(t) {
+  return (t.sw && t.sw.length ? t.sw : ['#888888']);
+}
+function buildColourMenu() {
+  const menu = $('#colourMenu');
+  if (!menu) return;
+  const cur = state.settings.theme;
+  menu.innerHTML = '';
+  for (const t of THEMES) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'dd-row' + (t.id === cur ? ' active' : '');
+    row.dataset.id = t.id;
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', t.id === cur ? 'true' : 'false');
+    row.innerHTML =
+      '<span class="dd-name">' + escapeHtml(t.name) + '</span>' +
+      '<span class="dd-pill">' + colourSwatches(t).map(c => `<i style="background:${c}"></i>`).join('') + '</span>';
+    row.onclick = () => {
+      const s = $('#themeColorSelect');
+      if (s) { s.value = t.id; s.dispatchEvent(new Event('change')); }
+      closeColourMenu();
+    };
+    menu.appendChild(row);
+  }
+}
+function syncColourToggle() {
+  const t = THEMES.find(x => x.id === state.settings.theme) || THEMES[0];
+  const name = $('#colourToggleName'), pill = $('#colourTogglePill');
+  if (name) name.textContent = t ? t.name : '';
+  if (pill) pill.innerHTML = t ? colourSwatches(t).map(c => `<i style="background:${c}"></i>`).join('') : '';
+}
+function openColourMenu() {
+  const menu = $('#colourMenu'), btn = $('#colourToggle');
+  if (!menu) return;
+  buildColourMenu();
+  // Fixed placement: the settings body scrolls, so an absolutely positioned
+  // menu would be clipped by it.
+  const r = btn.getBoundingClientRect();
+  menu.style.left = Math.round(r.left) + 'px';
+  menu.style.width = Math.round(r.width) + 'px';
+  menu.style.top = Math.round(r.bottom + 6) + 'px';
+  menu.style.maxHeight = Math.max(160, Math.round(window.innerHeight - r.bottom - 24)) + 'px';
+  menu.classList.remove('hidden');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  const active = menu.querySelector('.dd-row.active');
+  if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
+}
+function closeColourMenu() {
+  const menu = $('#colourMenu'), btn = $('#colourToggle');
+  if (menu) menu.classList.add('hidden');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+function colourMenuOpen() {
+  const menu = $('#colourMenu');
+  return !!menu && !menu.classList.contains('hidden');
 }
 function buildBackgroundGrid() {
   const sel = $('#themeBgSelect');
@@ -2370,7 +2424,16 @@ function syncSettingsUI() {
   const colour = $('#themeColorSelect');
   if (colour && !colour.dataset.wired) {
     colour.dataset.wired = '1';
-    colour.onchange = () => { applyTheme(colour.value); save(); buildBackgroundGrid(); };
+    colour.onchange = () => { applyTheme(colour.value); save(); buildBackgroundGrid(); buildColourMenu(); syncColourToggle(); };
+  }
+  const colourToggle = $('#colourToggle');
+  if (colourToggle && !colourToggle.dataset.wired) {
+    colourToggle.dataset.wired = '1';
+    colourToggle.onclick = () => { colourMenuOpen() ? closeColourMenu() : openColourMenu(); };
+    document.addEventListener('mousedown', (e) => {
+      const dd = $('#colourDd');
+      if (dd && !dd.contains(e.target)) closeColourMenu();
+    });
   }
   const bg = $('#themeBgSelect');
   if (bg && !bg.dataset.wired) {
@@ -3138,7 +3201,8 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === 'Escape') {
     if (document.fullscreenElement) return; // let the browser exit fullscreen first
-    if (settingsOpen()) closeSettings();
+    if (colourMenuOpen()) closeColourMenu();
+    else if (settingsOpen()) closeSettings();
     else if (!$('#modalOverlay').classList.contains('hidden')) closeModal(null);
     else if (!$('#contextMenu').classList.contains('hidden')) hideMenu();
     else if (pendingLink) { pendingLink = null; refreshLinkHL(); }

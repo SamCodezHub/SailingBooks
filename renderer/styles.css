@@ -712,6 +712,38 @@ kbd {
 }
 .set-row select:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-soft); }
 
+/* A select cannot carry a swatch, so colour gets a small custom dropdown:
+   one row per theme, the name on the left and its three-colour pill on the
+   right, the chosen one lit up. */
+.dd { position: relative; flex: 1; min-width: 0; }
+.dd-toggle {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px;
+  background: var(--soft); color: var(--ink); font: inherit; font-size: 13px;
+  cursor: pointer; text-align: left; outline: none;
+}
+.dd-toggle:focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-soft); }
+.dd-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-pill {
+  display: flex; height: 18px; width: 54px; flex: none; border-radius: 999px;
+  overflow: hidden; border: 1px solid var(--line);
+}
+.dd-pill i { flex: 1; }
+.dd-menu {
+  position: fixed; z-index: 200;
+  overflow-y: auto; padding: 4px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: var(--shadow-lg);
+}
+.dd-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: 0; border-radius: 8px; padding: 7px 9px; background: none;
+  color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; text-align: left;
+}
+.dd-row:hover { background: var(--soft); }
+.dd-row.active { background: var(--soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.dd-row .dd-name { font-weight: 600; }
+
 /* Settings blurs the page you were on instead of blanking it out. */
 #settingsScrim {
   position: fixed; inset: 0; z-index: 150;
@@ -834,7 +866,7 @@ body {
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-ui);
-  transition: background-color .32s var(--ease-ui), color .25s var(--ease-ui);
+  transition: color .25s var(--ease-ui);
 }
 button, input, select, textarea { font: inherit; }
 button, select { -webkit-tap-highlight-color: transparent; }
