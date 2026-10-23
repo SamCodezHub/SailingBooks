@@ -2155,49 +2155,50 @@ const BACKGROUNDS = window.SB_BACKGROUNDS || [];
 const THEME_IDS = THEMES.map(t => t.id);
 
 /* About forty typefaces for the reader - the system fallbacks, a stack of serifs,
- * sans-serifs and monospaces, and a few favourites people actually ask for. */
+ * sans-serifs and monospaces, and a few favourites people actually ask for.
+ * The name is what the dropdown shows; the stack is what the page is set in. */
 const FONT_FACES = [
-  'Georgia, \'Times New Roman\', serif',
-  '\'Iowan Old Style\', \'Palatino Linotype\', Palatino, serif',
-  '\'Playfair Display\', serif',
-  '\'Merriweather\', serif',
-  '\'Libre Baskerville\', serif',
-  '\'Lora\', serif',
-  '\'PT Serif\', serif',
-  '\'Cormorant Garamond\', serif',
-  '\'Spectral\', serif',
-  '\'Crimson Pro\', serif',
-  '\'EB Garamond\', serif',
-  '\'Noto Serif\', serif',
-  '\'Source Serif Pro\', serif',
-  'Cambria, serif',
-  'Rockwell, serif',
-  '\'Segoe UI\', system-ui, sans-serif',
-  'Inter, sans-serif',
-  '\'Helvetica Neue\', Helvetica, Arial, sans-serif',
-  'Roboto, sans-serif',
-  '\'Open Sans\', sans-serif',
-  'Lato, sans-serif',
-  'Montserrat, sans-serif',
-  'Poppins, sans-serif',
-  'Raleway, sans-serif',
-  '\'Source Sans Pro\', sans-serif',
-  'Noto Sans, sans-serif',
-  '\'Fira Sans\', sans-serif',
-  'Ubuntu, sans-serif',
-  'Cantarell, sans-serif',
-  '\'Trebuchet MS\', \'Segoe UI\', sans-serif',
-  'Verdana, Geneva, sans-serif',
-  'ui-monospace, \'Cascadia Mono\', Consolas, monospace',
-  '\'Courier New\', Courier, monospace',
-  '\'Fira Code\', monospace',
-  '\'Roboto Mono\', monospace',
-  '\'Source Code Pro\', monospace',
-  '\'JetBrains Mono\', monospace',
-  '\'Ubuntu Mono\', monospace',
-  '\'Space Mono\', monospace',
-  'Inconsolata, monospace',
-  'Hack, monospace'
+  { name: 'Georgia', stack: 'Georgia, \'Times New Roman\', serif' },
+  { name: 'Iowan Old Style', stack: '\'Iowan Old Style\', \'Palatino Linotype\', Palatino, serif' },
+  { name: 'Playfair Display', stack: '\'Playfair Display\', serif' },
+  { name: 'Merriweather', stack: '\'Merriweather\', serif' },
+  { name: 'Libre Baskerville', stack: '\'Libre Baskerville\', serif' },
+  { name: 'Lora', stack: '\'Lora\', serif' },
+  { name: 'PT Serif', stack: '\'PT Serif\', serif' },
+  { name: 'Cormorant Garamond', stack: '\'Cormorant Garamond\', serif' },
+  { name: 'Spectral', stack: '\'Spectral\', serif' },
+  { name: 'Crimson Pro', stack: '\'Crimson Pro\', serif' },
+  { name: 'EB Garamond', stack: '\'EB Garamond\', serif' },
+  { name: 'Noto Serif', stack: '\'Noto Serif\', serif' },
+  { name: 'Source Serif Pro', stack: '\'Source Serif Pro\', serif' },
+  { name: 'Cambria', stack: 'Cambria, serif' },
+  { name: 'Rockwell', stack: 'Rockwell, serif' },
+  { name: 'Segoe UI (sans)', stack: '\'Segoe UI\', system-ui, sans-serif' },
+  { name: 'Inter', stack: 'Inter, sans-serif' },
+  { name: 'Helvetica Neue', stack: '\'Helvetica Neue\', Helvetica, Arial, sans-serif' },
+  { name: 'Roboto', stack: 'Roboto, sans-serif' },
+  { name: 'Open Sans', stack: '\'Open Sans\', sans-serif' },
+  { name: 'Lato', stack: 'Lato, sans-serif' },
+  { name: 'Montserrat', stack: 'Montserrat, sans-serif' },
+  { name: 'Poppins', stack: 'Poppins, sans-serif' },
+  { name: 'Raleway', stack: 'Raleway, sans-serif' },
+  { name: 'Source Sans Pro', stack: '\'Source Sans Pro\', sans-serif' },
+  { name: 'Noto Sans', stack: 'Noto Sans, sans-serif' },
+  { name: 'Fira Sans', stack: '\'Fira Sans\', sans-serif' },
+  { name: 'Ubuntu', stack: 'Ubuntu, sans-serif' },
+  { name: 'Cantarell', stack: 'Cantarell, sans-serif' },
+  { name: 'Trebuchet MS', stack: '\'Trebuchet MS\', \'Segoe UI\', sans-serif' },
+  { name: 'Verdana', stack: 'Verdana, Geneva, sans-serif' },
+  { name: 'Cascadia Mono', stack: 'ui-monospace, \'Cascadia Mono\', Consolas, monospace' },
+  { name: 'Courier New', stack: '\'Courier New\', Courier, monospace' },
+  { name: 'Fira Code', stack: '\'Fira Code\', monospace' },
+  { name: 'Roboto Mono', stack: '\'Roboto Mono\', monospace' },
+  { name: 'Source Code Pro', stack: '\'Source Code Pro\', monospace' },
+  { name: 'JetBrains Mono', stack: '\'JetBrains Mono\', monospace' },
+  { name: 'Ubuntu Mono', stack: '\'Ubuntu Mono\', monospace' },
+  { name: 'Space Mono', stack: '\'Space Mono\', monospace' },
+  { name: 'Inconsolata', stack: 'Inconsolata, monospace' },
+  { name: 'Hack', stack: 'Hack, monospace' }
 ];
 
 function applyTheme(name) {
@@ -2365,9 +2366,17 @@ function syncColourToggle() {
   if (pill) pill.innerHTML = t ? colourSwatches(t).map(c => `<i style="background:${c}"></i>`).join('') : '';
 }
 function openColourMenu() {
-  const menu = $('#colourMenu'), btn = $('#colourToggle');
-  if (!menu) return;
-  buildColourMenu();
+  openDdMenu($('#colourMenu'), $('#colourToggle'));
+}
+function closeColourMenu() {
+  closeDdMenu($('#colourMenu'), $('#colourToggle'));
+}
+function colourMenuOpen() {
+  const menu = $('#colourMenu');
+  return !!menu && !menu.classList.contains('hidden');
+}
+function openDdMenu(menu, btn) {
+  if (!menu || !btn) return;
   // Fixed placement: the settings body scrolls, so an absolutely positioned
   // menu would be clipped by it.
   const r = btn.getBoundingClientRect();
@@ -2376,18 +2385,19 @@ function openColourMenu() {
   menu.style.top = Math.round(r.bottom + 6) + 'px';
   menu.style.maxHeight = Math.max(160, Math.round(window.innerHeight - r.bottom - 24)) + 'px';
   menu.classList.remove('hidden');
-  if (btn) btn.setAttribute('aria-expanded', 'true');
+  btn.setAttribute('aria-expanded', 'true');
   const active = menu.querySelector('.dd-row.active');
   if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
 }
-function closeColourMenu() {
-  const menu = $('#colourMenu'), btn = $('#colourToggle');
+function closeDdMenu(menu, btn) {
   if (menu) menu.classList.add('hidden');
   if (btn) btn.setAttribute('aria-expanded', 'false');
 }
-function colourMenuOpen() {
-  const menu = $('#colourMenu');
-  return !!menu && !menu.classList.contains('hidden');
+function paintBgPreview(el, b) {
+  if (!el || !b) return;
+  el.style.backgroundImage = b.css && b.css !== 'none' ? b.css : 'none';
+  el.style.backgroundSize = b.size || 'auto';
+  el.style.backgroundColor = 'var(--bg)';
 }
 function buildBackgroundGrid() {
   const sel = $('#themeBgSelect');
@@ -2400,6 +2410,49 @@ function buildBackgroundGrid() {
     sel.appendChild(o);
   }
   sel.value = state.settings.background || prev || BACKGROUNDS[0].id;
+  buildBackgroundMenu();
+  syncBackgroundToggle();
+}
+function buildBackgroundMenu() {
+  const menu = $('#bgMenu');
+  if (!menu) return;
+  const cur = state.settings.background;
+  menu.innerHTML = '';
+  for (const b of BACKGROUNDS) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'dd-row' + (b.id === cur ? ' active' : '');
+    row.dataset.id = b.id;
+    row.setAttribute('role', 'option');
+    row.setAttribute('aria-selected', b.id === cur ? 'true' : 'false');
+    row.innerHTML =
+      '<span class="dd-name">' + escapeHtml(b.name) + '</span>' +
+      '<span class="dd-preview"></span>';
+    paintBgPreview(row.querySelector('.dd-preview'), b);
+    row.onclick = () => {
+      const s = $('#themeBgSelect');
+      if (s) { s.value = b.id; s.dispatchEvent(new Event('change')); }
+      closeBgMenu();
+    };
+    menu.appendChild(row);
+  }
+}
+function syncBackgroundToggle() {
+  const b = BACKGROUNDS.find(x => x.id === state.settings.background) || BACKGROUNDS[0];
+  const name = $('#bgToggleName'), prev = $('#bgTogglePreview');
+  if (name) name.textContent = b ? b.name : '';
+  paintBgPreview(prev, b);
+}
+function openBgMenu() {
+  buildBackgroundMenu();
+  openDdMenu($('#bgMenu'), $('#bgToggle'));
+}
+function closeBgMenu() {
+  closeDdMenu($('#bgMenu'), $('#bgToggle'));
+}
+function bgMenuOpen() {
+  const menu = $('#bgMenu');
+  return !!menu && !menu.classList.contains('hidden');
 }
 function buildFontGrid() {
   const sel = $('#setFontFamily');
@@ -2408,10 +2461,10 @@ function buildFontGrid() {
   sel.innerHTML = '';
   for (const f of FONT_FACES) {
     const o = document.createElement('option');
-    o.value = f; o.textContent = f;
+    o.value = f.stack; o.textContent = f.name;
     sel.appendChild(o);
   }
-  sel.value = state.settings.fontFamily || prev || FONT_FACES[0];
+  sel.value = state.settings.fontFamily || prev || FONT_FACES[0].stack;
 }
 
 /* A handle on the two lists and the two functions that apply them. The checks
@@ -2438,7 +2491,16 @@ function syncSettingsUI() {
   const bg = $('#themeBgSelect');
   if (bg && !bg.dataset.wired) {
     bg.dataset.wired = '1';
-    bg.onchange = () => { applyBackground(bg.value); save(); };
+    bg.onchange = () => { applyBackground(bg.value); save(); buildBackgroundMenu(); syncBackgroundToggle(); };
+  }
+  const bgToggle = $('#bgToggle');
+  if (bgToggle && !bgToggle.dataset.wired) {
+    bgToggle.dataset.wired = '1';
+    bgToggle.onclick = () => { bgMenuOpen() ? closeBgMenu() : openBgMenu(); };
+    document.addEventListener('mousedown', (e) => {
+      const dd = $('#bgDd');
+      if (dd && !dd.contains(e.target)) closeBgMenu();
+    });
   }
   const size = $('#setFontSize');
   if (size) size.textContent = state.settings.fontSize + 'px';
@@ -3202,6 +3264,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (document.fullscreenElement) return; // let the browser exit fullscreen first
     if (colourMenuOpen()) closeColourMenu();
+    else if (bgMenuOpen()) closeBgMenu();
     else if (settingsOpen()) closeSettings();
     else if (!$('#modalOverlay').classList.contains('hidden')) closeModal(null);
     else if (!$('#contextMenu').classList.contains('hidden')) hideMenu();

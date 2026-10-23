@@ -68,7 +68,14 @@
         <h3 class="set-label">Background</h3>
         <div class="set-row">
           <span>Effect</span>
-          <select id="themeBgSelect"></select>
+          <div class="dd" id="bgDd">
+            <button type="button" class="dd-toggle" id="bgToggle" aria-haspopup="listbox" aria-expanded="false">
+              <span class="dd-name" id="bgToggleName"></span>
+              <span class="dd-preview" id="bgTogglePreview"></span>
+            </button>
+            <div class="dd-menu hidden" id="bgMenu" role="listbox" aria-label="Background effect"></div>
+          </div>
+          <select id="themeBgSelect" class="hidden" aria-hidden="true" tabindex="-1"></select>
         </div>
       </section>
       <section class="set-block">
