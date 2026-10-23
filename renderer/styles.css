@@ -444,7 +444,11 @@ body {
   transition: transform .18s ease;
 }
 #pagedInner img { max-width: 100%; height: auto; break-inside: avoid; border-radius: 6px; }
-#pagedInner p, #pagedInner h1, #pagedInner h2, #pagedInner h3, #pagedInner figure, #pagedInner blockquote { break-inside: avoid; }
+/* Headings and figures stay whole, but a paragraph is allowed to run to the
+   foot of the page and carry on overleaf — otherwise a paragraph that is a
+   line too tall leaves a hole at the bottom of the page. */
+#pagedInner h1, #pagedInner h2, #pagedInner h3, #pagedInner figure { break-inside: avoid; }
+#pagedInner p { orphans: 2; widows: 2; }
 #pagedInner h1, #pagedInner h2, #pagedInner h3 { line-height: 1.25; color: var(--strong); }
 
 #tocDrawer {
